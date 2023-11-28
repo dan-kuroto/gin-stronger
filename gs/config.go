@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"sync"
 	"unicode/utf8"
 
 	"gopkg.in/yaml.v3"
@@ -34,27 +33,33 @@ type Configuration struct {
 	} `yaml:"snow-flake"`
 }
 
-var configInstance Configuration
-var configLoadOnce sync.Once
+// default config instance
+var Config Configuration
+
+// It is shorthand for gs.Init(&gs.Config)
+func InitDefault() {
+	Init(&Config)
+	log.Println("config load complete")
+}
 
 // Load config from application.yml, application-{env}.yml and cmd parameters.
 // (`env` is given by applicaiotn.yml)
-func initConfig() {
+func Init(config *Configuration) {
 	// init by application.yml
 	data, err := os.ReadFile("application.yml")
 	if err != nil {
 		panic(err)
 	}
-	if err := yaml.Unmarshal(data, &configInstance); err != nil {
+	if err := yaml.Unmarshal(data, &config); err != nil {
 		panic(err)
 	}
 	// init by application-{env}.yml
-	if utf8.RuneCountInString(configInstance.Env.Active) != 0 {
-		data, err = os.ReadFile("application-" + configInstance.Env.Active + ".yml")
+	if utf8.RuneCountInString(config.Env.Active) != 0 {
+		data, err = os.ReadFile("application-" + config.Env.Active + ".yml")
 		if err != nil {
 			panic(err)
 		}
-		if err := yaml.Unmarshal(data, configInstance); err != nil {
+		if err := yaml.Unmarshal(data, config); err != nil {
 			panic(err)
 		}
 	}
@@ -64,16 +69,14 @@ func initConfig() {
 	port := flag.Int("port", 0, "gin port")
 	flag.Parse()
 	if *release {
-		configInstance.Gin.Release = true
+		config.Gin.Release = true
 	}
 	if *host != "" {
-		configInstance.Gin.Host = *host
+		config.Gin.Host = *host
 	}
 	if *port != 0 {
-		configInstance.Gin.Port = *port
+		config.Gin.Port = *port
 	}
-
-	log.Println("config load complete")
 }
 
 func (config *Configuration) GetGinAddr() string {
@@ -82,10 +85,4 @@ func (config *Configuration) GetGinAddr() string {
 	} else {
 		return fmt.Sprintf("%s:%d", config.Gin.Host, config.Gin.Port)
 	}
-}
-
-func GetConfig() (config *Configuration) {
-	configLoadOnce.Do(initConfig)
-	config = &configInstance
-	return
 }
