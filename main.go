@@ -6,18 +6,21 @@ import (
 	"github.com/dan-kuroto/gin-stronger/gs"
 )
 
-type Configuration struct {
-	gs.Configuration
-	Hello bool `yaml:"hello"`
+type Configuration2 struct {
+	gs.Configuration `yaml:",inline"`
+	Hello            string `yaml:"hello"`
 }
 
-var Config Configuration
+var Config Configuration2
 
 // test
+func init() {
+	// gs.InitConfigDefault()
+	// gs.InitConfig(&gs.Config)
+	gs.InitConfig(&Config)
+}
+
 func main() {
-	gs.Init(&gs.Config)
-	// gs.InitDefault()
-	// TODO: 如何让一个函数能接受一个struct和继承struct的struct作为参数？
-	// gs.Init(&Config)
 	fmt.Printf("GetConfig(): %v\n", gs.Config)
+	fmt.Printf("GetConfig(): %v\n", Config)
 }
