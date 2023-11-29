@@ -2,9 +2,8 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/dan-kuroto/gin-stronger/gs"
+	"github.com/gin-gonic/gin"
 )
 
 func init() {
@@ -12,5 +11,9 @@ func init() {
 }
 
 func main() {
-	fmt.Printf("config: %v\n", gs.Config)
+	engine := gin.Default()
+
+	gs.RegisterRouterMap(engine, GetRouterMap())
+
+	engine.Run(gs.Config.GetGinAddr())
 }
