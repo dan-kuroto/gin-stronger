@@ -13,6 +13,7 @@ type RouterMapValue interface {
 	isRouterMapValue()
 }
 
+// TODO: 果然还是要魔改，用vue-router那种搞法，直接用children来解决
 type RouterHandler gin.HandlerFunc
 
 func (RouterHandler) isRouterMapValue() {}
@@ -25,7 +26,7 @@ type RouterMap map[string]RouterMapValue
 
 func (RouterMap) isRouterMapValue() {}
 
-// 真正实现深度遍历的函数，rootPath应初始化为""
+// Initial rootPath must be empty string
 func walkRouterMap(routerMap RouterMap, rootPath string, callback func(rootPath string, subPath string, value RouterHandler)) {
 	for subPath, value := range routerMap {
 		switch value := value.(type) {
@@ -41,9 +42,6 @@ func walkRouterMap(routerMap RouterMap, rootPath string, callback func(rootPath 
 	}
 }
 
-// 深度遍历RouterMap，对每个RouterHandler执行callback
-//
-// 根本用不上的函数，只是为了方便测试，实际注册路由时用的是RegisterRouterMap
 func WalkRouterMap(routerMap RouterMap, callback func(rootPath string, subPath string, value RouterHandler)) {
 	walkRouterMap(routerMap, "", callback)
 }
@@ -55,6 +53,7 @@ type ginEngineOrGroup interface {
 	Group(relativePath string, handlers ...gin.HandlerFunc) *gin.RouterGroup
 }
 
+// TODO: 这里是否有必要用泛型？
 type response struct {
 	Code int
 	Msg  string
@@ -116,10 +115,7 @@ func packageHandlerFunc(handler RouterHandler) gin.HandlerFunc {
 	}
 }
 
-// 对RouterMap中的路由进行注册
 func RegisterRouterMap(router ginEngineOrGroup, routerMap RouterMap) {
-	// 这里不能用WalkRouterMap，因为WalkRouterMap无法让callback知道当前类型
-	// (而我们需要判断类型，以对Map创建新Group)
 	for path, value := range routerMap {
 		switch value := value.(type) {
 		case RouterHandler:
@@ -127,10 +123,9 @@ func RegisterRouterMap(router ginEngineOrGroup, routerMap RouterMap) {
 			router.GET(path, packageHandlerFunc(value))
 			router.POST(path, packageHandlerFunc(value))
 		case RouterHandlers:
-			// 把RouterHandlers转换成...gin.HandlerFunc
-			handlers := make([]gin.HandlerFunc, len(value))
-			for i, handler := range value {
-				handlers[i] = packageHandlerFunc(handler)
+			handlers := make([]gin.HandlerFunc, 0, len(value))
+			for _, handler := range value {
+				handlers = append(handlers, packageHandlerFunc(handler))
 			}
 			router.GET(path, handlers...)
 			router.POST(path, handlers...)
@@ -141,7 +136,6 @@ func RegisterRouterMap(router ginEngineOrGroup, routerMap RouterMap) {
 	}
 }
 
-// 注册静态文件
 func RegisterStatic(router *gin.Engine, staticMap map[string]string) {
 	for urlPath, filePath := range staticMap {
 		router.Static(urlPath, filePath)
