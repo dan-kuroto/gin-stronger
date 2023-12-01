@@ -17,10 +17,17 @@ func HandlerFuncDemo2(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Hello World!"})
 }
 
-func GetRouterMap() gs.RouterMap {
-	return gs.RouterMap{
-		"/api": gs.RouterMap{
-			"/hello": gs.RouterHandlers{HandlerFuncDemo1, HandlerFuncDemo2},
+func GetRouters() []gs.Router {
+	return []gs.Router{
+		{
+			Path: "/api",
+			Children: []gs.Router{
+				{
+					Path:     "/hello",
+					Methods:  []gs.Method{gs.GET, gs.POST},
+					Handlers: []gin.HandlerFunc{HandlerFuncDemo1, HandlerFuncDemo2},
+				},
+			},
 		},
 	}
 }

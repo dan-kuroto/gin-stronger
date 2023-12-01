@@ -9,51 +9,40 @@ import (
 
 // TODO: 这里的使用方法还不够好，另外注释要改成英文
 
-type RouterMapValue interface {
-	isRouterMapValue()
+type Method string
+
+const (
+	GET     Method = http.MethodGet
+	HEAD    Method = http.MethodHead
+	POST    Method = http.MethodPost
+	PUT     Method = http.MethodPut
+	PATCH   Method = http.MethodPatch
+	DELETE  Method = http.MethodDelete
+	CONNECT Method = http.MethodConnect
+	OPTIONS Method = http.MethodOptions
+	TRACE   Method = http.MethodTrace
+)
+
+type Router struct {
+	Path     string
+	Methods  []Method
+	Handlers []gin.HandlerFunc
+	Children []Router
 }
 
-// TODO: 果然还是要魔改，用vue-router那种搞法，直接用children来解决
-type RouterHandler gin.HandlerFunc
-
-func (RouterHandler) isRouterMapValue() {}
-
-type RouterHandlers []RouterHandler
-
-func (RouterHandlers) isRouterMapValue() {}
-
-type RouterMap map[string]RouterMapValue
-
-func (RouterMap) isRouterMapValue() {}
-
-// Initial rootPath must be empty string
-func walkRouterMap(routerMap RouterMap, rootPath string, callback func(rootPath string, subPath string, value RouterHandler)) {
-	for subPath, value := range routerMap {
-		switch value := value.(type) {
-		case RouterHandler:
-			callback(rootPath, subPath, value)
-		case RouterHandlers:
-			for _, handler := range value {
-				callback(rootPath, subPath, handler)
-			}
-		case RouterMap:
-			walkRouterMap(value, rootPath+subPath, callback)
-		}
-	}
-}
-
-func WalkRouterMap(routerMap RouterMap, callback func(rootPath string, subPath string, value RouterHandler)) {
-	walkRouterMap(routerMap, "", callback)
-}
-
-// 用于RegisterRouterMap的辅助接口，使其能够同时支持gin.Engine和gin.RouterGroup
 type ginEngineOrGroup interface {
 	GET(relativePath string, handlers ...gin.HandlerFunc) gin.IRoutes
+	HEAD(relativePath string, handlers ...gin.HandlerFunc) gin.IRoutes
 	POST(relativePath string, handlers ...gin.HandlerFunc) gin.IRoutes
+	PUT(relativePath string, handlers ...gin.HandlerFunc) gin.IRoutes
+	PATCH(relativePath string, handlers ...gin.HandlerFunc) gin.IRoutes
+	DELETE(relativePath string, handlers ...gin.HandlerFunc) gin.IRoutes
+	OPTIONS(relativePath string, handlers ...gin.HandlerFunc) gin.IRoutes
+	Any(relativePath string, handlers ...gin.HandlerFunc) gin.IRoutes
 	Group(relativePath string, handlers ...gin.HandlerFunc) *gin.RouterGroup
+	Handle(httpMethod, relativePath string, handlers ...gin.HandlerFunc) gin.IRoutes
 }
 
-// TODO: 这里是否有必要用泛型？
 type response struct {
 	Code int
 	Msg  string
@@ -95,7 +84,7 @@ func ThrowS(format string, a ...any) {
 }
 
 // 包装一下handler，这样一来出错时直接panic就行了
-func packageHandlerFunc(handler RouterHandler) gin.HandlerFunc {
+func packageHandlerFunc(router *Router) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		defer func() {
 			// 如果没有panic，认为用户使用了自己的处理逻辑，不做处理
@@ -111,28 +100,29 @@ func packageHandlerFunc(handler RouterHandler) gin.HandlerFunc {
 				}
 			}
 		}()
-		handler(c)
+		for _, handler := range router.Handlers {
+			handler(c)
+		}
 	}
 }
 
-func RegisterRouterMap(router ginEngineOrGroup, routerMap RouterMap) {
-	for path, value := range routerMap {
-		switch value := value.(type) {
-		case RouterHandler:
-			// TODO: 目前是强制GET+POST全部注册，以后要加上method字段控制注册哪个
-			router.GET(path, packageHandlerFunc(value))
-			router.POST(path, packageHandlerFunc(value))
-		case RouterHandlers:
-			handlers := make([]gin.HandlerFunc, 0, len(value))
-			for _, handler := range value {
-				handlers = append(handlers, packageHandlerFunc(handler))
-			}
-			router.GET(path, handlers...)
-			router.POST(path, handlers...)
-		case RouterMap:
-			group := router.Group(path)
-			RegisterRouterMap(group, value)
+// TODO: 魔改返回机制
+func UseRouter(router ginEngineOrGroup, gsRouter *Router) {
+	if len(gsRouter.Children) == 0 {
+		for _, method := range gsRouter.Methods {
+			router.Handle(string(method), gsRouter.Path, gsRouter.Handlers...)
 		}
+	} else {
+		group := router.Group(gsRouter.Path)
+		for _, subRouter := range gsRouter.Children {
+			UseRouter(group, &subRouter)
+		}
+	}
+}
+
+func UseRouters(router ginEngineOrGroup, gsRouters []Router) {
+	for _, gsRouter := range gsRouters {
+		UseRouter(router, &gsRouter)
 	}
 }
 

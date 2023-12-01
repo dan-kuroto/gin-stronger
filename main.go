@@ -13,7 +13,7 @@ func init() {
 func main() {
 	engine := gin.Default()
 
-	gs.RegisterRouterMap(engine, GetRouterMap())
+	gs.UseRouters(engine, GetRouters())
 
 	engine.Run(gs.Config.GetGinAddr())
 }
