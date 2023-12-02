@@ -17,17 +17,39 @@ func HandlerFuncDemo2(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Hello World!"})
 }
 
+func HandlerFuncDemo3(c *gin.Context) {
+	panic("test")
+}
+
 func GetRouters() []gs.Router {
 	return []gs.Router{
 		{
 			Path: "/api",
 			Children: []gs.Router{
 				{
-					Path:     "/hello",
-					Methods:  []gs.Method{gs.GET, gs.POST},
+					Path:     "/hello1",
+					Method:   gs.GET | gs.POST,
+					Handlers: []gin.HandlerFunc{HandlerFuncDemo1, HandlerFuncDemo2},
+				},
+				{
+					Path:     "/hello2",
+					Method:   gs.GET | gs.HEAD | gs.POST | gs.PUT | gs.PATCH | gs.DELETE | gs.CONNECT | gs.OPTIONS | gs.TRACE,
 					Handlers: []gin.HandlerFunc{HandlerFuncDemo1, HandlerFuncDemo2},
 				},
 			},
+		},
+		{
+			Path:     "/test1",
+			Method:   gs.Any,
+			Handlers: []gin.HandlerFunc{HandlerFuncDemo2},
+		},
+		{
+			Path:     "/test2",
+			Handlers: []gin.HandlerFunc{HandlerFuncDemo2},
+		},
+		{
+			Path:     "/test3",
+			Handlers: []gin.HandlerFunc{HandlerFuncDemo3},
 		},
 	}
 }

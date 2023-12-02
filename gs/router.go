@@ -1,31 +1,30 @@
 package gs
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
 
-// TODO: 这里的使用方法还不够好，另外注释要改成英文
-
-type Method string
+type HttpMethod uint16
 
 const (
-	GET     Method = http.MethodGet
-	HEAD    Method = http.MethodHead
-	POST    Method = http.MethodPost
-	PUT     Method = http.MethodPut
-	PATCH   Method = http.MethodPatch
-	DELETE  Method = http.MethodDelete
-	CONNECT Method = http.MethodConnect
-	OPTIONS Method = http.MethodOptions
-	TRACE   Method = http.MethodTrace
+	GET     HttpMethod = 0b000000001
+	HEAD    HttpMethod = 0b000000010
+	POST    HttpMethod = 0b000000100
+	PUT     HttpMethod = 0b000001000
+	PATCH   HttpMethod = 0b000010000
+	DELETE  HttpMethod = 0b000100000
+	CONNECT HttpMethod = 0b001000000
+	OPTIONS HttpMethod = 0b010000000
+	TRACE   HttpMethod = 0b100000000
+	Any     HttpMethod = 0b111111111
 )
 
 type Router struct {
-	Path     string
-	Methods  []Method
+	Path string
+	// default value is gs.GET
+	Method   HttpMethod
 	Handlers []gin.HandlerFunc
 	Children []Router
 }
@@ -43,75 +42,45 @@ type ginEngineOrGroup interface {
 	Handle(httpMethod, relativePath string, handlers ...gin.HandlerFunc) gin.IRoutes
 }
 
-type response struct {
-	Code int
-	Msg  string
-	Data any
-}
-
-// 默认的c.JSON能被多次调用,经封装后保证只会调用一次,返回{"msg": "ok", "data": data}
-func Return(data any) {
-	panic(response{Code: http.StatusOK, Msg: "ok", Data: data})
-}
-
-// 默认的c.JSON能被多次调用,经封装后保证只会调用一次
-func Throw(code int, msg string, data any) {
-	panic(response{Code: code, Msg: msg, Data: data})
-}
-
-// TODO: 重构一下,加上允许提供msg的功能,否则非throw情况下msg屁用没有,刚好可以给新增数据用
-// Return的更省事调用方法: for string (format)
-func ReturnS(format string, a ...any) {
-	if len(a) == 0 {
-		Return(format)
+func handleRouter(router ginEngineOrGroup, gsRouter *Router) {
+	if gsRouter.Method == Any {
+		router.Any(gsRouter.Path, gsRouter.Handlers...)
+	} else if gsRouter.Method == 0 {
+		router.GET(gsRouter.Path, gsRouter.Handlers...)
 	} else {
-		Return(fmt.Sprintf(format, a...))
-	}
-}
-
-// Error的更省事调用法: for error
-func ThrowE(err error) {
-	Throw(http.StatusInternalServerError, err.Error(), nil)
-}
-
-// Error的更省事调用法: for string
-func ThrowS(format string, a ...any) {
-	if len(a) == 0 {
-		Throw(http.StatusInternalServerError, format, nil)
-	} else {
-		Throw(http.StatusInternalServerError, fmt.Sprintf(format, a...), nil)
-	}
-}
-
-// 包装一下handler，这样一来出错时直接panic就行了
-func packageHandlerFunc(router *Router) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		defer func() {
-			// 如果没有panic，认为用户使用了自己的处理逻辑，不做处理
-			if r := recover(); r != nil {
-				switch r := r.(type) {
-				case response:
-					c.JSON(r.Code, gin.H{
-						"msg":  r.Msg,
-						"data": r.Data,
-					})
-				default: // 用户自己用panic也可以,但默认code是StatusOK了
-					c.JSON(http.StatusOK, r)
-				}
-			}
-		}()
-		for _, handler := range router.Handlers {
-			handler(c)
+		if gsRouter.Method&GET != 0 {
+			router.Handle(http.MethodGet, gsRouter.Path, gsRouter.Handlers...)
+		}
+		if gsRouter.Method&HEAD != 0 {
+			router.Handle(http.MethodHead, gsRouter.Path, gsRouter.Handlers...)
+		}
+		if gsRouter.Method&POST != 0 {
+			router.Handle(http.MethodPost, gsRouter.Path, gsRouter.Handlers...)
+		}
+		if gsRouter.Method&PUT != 0 {
+			router.Handle(http.MethodPut, gsRouter.Path, gsRouter.Handlers...)
+		}
+		if gsRouter.Method&PATCH != 0 {
+			router.Handle(http.MethodPatch, gsRouter.Path, gsRouter.Handlers...)
+		}
+		if gsRouter.Method&DELETE != 0 {
+			router.Handle(http.MethodDelete, gsRouter.Path, gsRouter.Handlers...)
+		}
+		if gsRouter.Method&CONNECT != 0 {
+			router.Handle(http.MethodConnect, gsRouter.Path, gsRouter.Handlers...)
+		}
+		if gsRouter.Method&OPTIONS != 0 {
+			router.Handle(http.MethodOptions, gsRouter.Path, gsRouter.Handlers...)
+		}
+		if gsRouter.Method&TRACE != 0 {
+			router.Handle(http.MethodTrace, gsRouter.Path, gsRouter.Handlers...)
 		}
 	}
 }
 
-// TODO: 魔改返回机制
 func UseRouter(router ginEngineOrGroup, gsRouter *Router) {
 	if len(gsRouter.Children) == 0 {
-		for _, method := range gsRouter.Methods {
-			router.Handle(string(method), gsRouter.Path, gsRouter.Handlers...)
-		}
+		handleRouter(router, gsRouter)
 	} else {
 		group := router.Group(gsRouter.Path)
 		for _, subRouter := range gsRouter.Children {
@@ -125,6 +94,9 @@ func UseRouters(router ginEngineOrGroup, gsRouters []Router) {
 		UseRouter(router, &gsRouter)
 	}
 }
+
+// TODO: 1. 利用泛型机制使参数和返回值支持直接为结构体(就像SpringBoot一样)
+// TODO: 2. 测了下gin有自带的panic recover机制，查一下能不能像SpringBoot一样自己加拦截器
 
 func RegisterStatic(router *gin.Engine, staticMap map[string]string) {
 	for urlPath, filePath := range staticMap {
