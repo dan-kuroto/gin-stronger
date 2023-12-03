@@ -33,6 +33,23 @@ func getFunctionResultTypes(funcType reflect.Type) []reflect.Type {
 	return types
 }
 
+func callFunction(function any, params ...any) []any {
+	funcValue := reflect.ValueOf(function)
+
+	input := make([]reflect.Value, 0, len(params))
+	for _, param := range params {
+		input = append(input, reflect.ValueOf(param))
+	}
+
+	output := funcValue.Call(input)
+
+	results := make([]any, 0, len(output))
+	for _, value := range output {
+		results = append(results, value.Interface())
+	}
+	return results
+}
+
 // functions:
 // Parameters can include *gin.Context and request struct.
 // No result or return gs.IResponse
@@ -43,11 +60,24 @@ func PackageHandlers(functions ...any) []gin.HandlerFunc {
 		paramTypes := getFunctionParamTypes(funcType)
 		resultTypes := getFunctionResultTypes(funcType)
 
+		if len(paramTypes) > 2 {
+			panic("function parameter type is not supported")
+		}
+		if len(resultTypes) > 1 {
+			panic("function result type is not supported")
+		}
+		if len(paramTypes) == 2 {
+			if (paramTypes[0] != ginContextType && paramTypes[1] != ginContextType) ||
+				(paramTypes[0] == ginContextType && paramTypes[1] == ginContextType) {
+				panic("function parameter type is not supported")
+			}
+		}
 		// if function is gin.HandlerFunc, packaging is unnecessary
 		if len(paramTypes) == 1 && len(resultTypes) == 0 && paramTypes[0] == ginContextType {
 			handlers = append(handlers, gin.HandlerFunc(function.(func(*gin.Context))))
 			continue
 		}
+		// TODO: 构造gin.HandlerFunc并append
 	}
 	return handlers
 }
