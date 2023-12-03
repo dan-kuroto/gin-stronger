@@ -95,9 +95,6 @@ func UseRouters(router ginEngineOrGroup, gsRouters []Router) {
 	}
 }
 
-// TODO: 1. 利用泛型机制使参数和返回值支持直接为结构体(就像SpringBoot一样)
-// TODO: 2. 测了下gin有自带的panic recover机制，查一下能不能像SpringBoot一样自己加拦截器
-
 func RegisterStatic(router *gin.Engine, staticMap map[string]string) {
 	for urlPath, filePath := range staticMap {
 		router.Static(urlPath, filePath)
