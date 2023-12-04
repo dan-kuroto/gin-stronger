@@ -18,7 +18,7 @@ func HandlerFuncDemo() {
 }
 
 func HandlerFuncDemo1(c *gin.Context) {
-	c.JSON(http.StatusAccepted, map[string]any{"hello": "world"})
+	c.JSON(http.StatusOK, map[string]any{"hello": "world"})
 }
 
 func HandlerFuncDemo2(c *gin.Context) HelloStruct {

@@ -40,6 +40,27 @@ func callFunction(funcValue reflect.Value, inputs ...reflect.Value) []any {
 	return results
 }
 
+func packageHandler(function any, paramTypes []reflect.Type, resultTypes []reflect.Type) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		params := make([]reflect.Value, 0, len(paramTypes))
+		for _, paramType := range paramTypes {
+			if paramType == ginContextType {
+				params = append(params, reflect.ValueOf(c))
+			} else {
+				param := reflect.New(paramType)
+				if err := c.ShouldBind(param.Interface()); err != nil {
+					panic(err)
+				}
+				params = append(params, param)
+			}
+		}
+		results := callFunction(reflect.ValueOf(function), params...)
+		if len(results) == 1 {
+			c.JSON(http.StatusOK, results[0])
+		}
+	}
+}
+
 // functions:
 // Parameters can include *gin.Context and request struct.
 // No result or return gs.IResponse
@@ -66,25 +87,7 @@ func PackageHandlers(functions ...any) []gin.HandlerFunc {
 		if len(paramTypes) == 1 && len(resultTypes) == 0 && paramTypes[0] == ginContextType {
 			handlers = append(handlers, gin.HandlerFunc(function.(func(*gin.Context))))
 		} else {
-			handlers = append(handlers, func(c *gin.Context) {
-				// TODO: 有bug,猜测是此处闭包的问题,多封一层函数或可解决;另有结构体/nil导致的问题,后面再说
-				params := make([]reflect.Value, 0, len(paramTypes))
-				for _, paramType := range paramTypes {
-					if paramType == ginContextType {
-						params = append(params, reflect.ValueOf(c))
-					} else {
-						param := reflect.New(paramType)
-						if err := c.ShouldBind(param.Interface()); err != nil {
-							panic(err)
-						}
-						params = append(params, param)
-					}
-				}
-				results := callFunction(reflect.ValueOf(function), params...)
-				if len(results) == 1 {
-					c.JSON(http.StatusOK, results[0])
-				}
-			})
+			handlers = append(handlers, packageHandler(function, paramTypes, resultTypes))
 		}
 	}
 	return handlers
