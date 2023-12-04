@@ -1,16 +1,13 @@
 package gs
 
 import (
+	"net/http"
 	"reflect"
 
 	"github.com/gin-gonic/gin"
 )
 
 var ginContextType = reflect.TypeOf(&gin.Context{})
-
-type IResponse interface {
-	ToMap() map[string]any
-}
 
 // TODO: 1. 利用泛型机制使参数和返回值支持直接为结构体(就像SpringBoot一样)
 // TODO: 2. 测了下gin有自带的panic recover机制，查一下能不能像SpringBoot一样自己加拦截器
@@ -33,15 +30,8 @@ func getFunctionResultTypes(funcType reflect.Type) []reflect.Type {
 	return types
 }
 
-func callFunction(function any, params ...any) []any {
-	funcValue := reflect.ValueOf(function)
-
-	input := make([]reflect.Value, 0, len(params))
-	for _, param := range params {
-		input = append(input, reflect.ValueOf(param))
-	}
-
-	output := funcValue.Call(input)
+func callFunction(funcValue reflect.Value, inputs ...reflect.Value) []any {
+	output := funcValue.Call(inputs)
 
 	results := make([]any, 0, len(output))
 	for _, value := range output {
@@ -75,9 +65,27 @@ func PackageHandlers(functions ...any) []gin.HandlerFunc {
 		// if function is gin.HandlerFunc, packaging is unnecessary
 		if len(paramTypes) == 1 && len(resultTypes) == 0 && paramTypes[0] == ginContextType {
 			handlers = append(handlers, gin.HandlerFunc(function.(func(*gin.Context))))
-			continue
+		} else {
+			handlers = append(handlers, func(c *gin.Context) {
+				// TODO: 有bug,猜测是此处闭包的问题,多封一层函数或可解决;另有结构体/nil导致的问题,后面再说
+				params := make([]reflect.Value, 0, len(paramTypes))
+				for _, paramType := range paramTypes {
+					if paramType == ginContextType {
+						params = append(params, reflect.ValueOf(c))
+					} else {
+						param := reflect.New(paramType)
+						if err := c.ShouldBind(param.Interface()); err != nil {
+							panic(err)
+						}
+						params = append(params, param)
+					}
+				}
+				results := callFunction(reflect.ValueOf(function), params...)
+				if len(results) == 1 {
+					c.JSON(http.StatusOK, results[0])
+				}
+			})
 		}
-		// TODO: 构造gin.HandlerFunc并append
 	}
 	return handlers
 }
