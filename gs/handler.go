@@ -9,8 +9,7 @@ import (
 
 var ginContextType = reflect.TypeOf(&gin.Context{})
 
-// TODO: 1. 利用泛型机制使参数和返回值支持直接为结构体(就像SpringBoot一样)
-// TODO: 2. 测了下gin有自带的panic recover机制，查一下能不能像SpringBoot一样自己加拦截器
+type RecoveryFunc[T any] func(c *gin.Context, err T)
 
 func getFunctionParamTypes(funcType reflect.Type) []reflect.Type {
 	numIn := funcType.NumIn()
@@ -91,4 +90,11 @@ func PackageHandlers(functions ...any) []gin.HandlerFunc {
 		}
 	}
 	return handlers
+}
+
+// Register recovery function for specific type
+//
+// ATTENSION: You should call it before register router handlers!!!
+func UsePanicHandler[T any](errExample T, handler RecoveryFunc[T]) {
+	// TODO ...
 }
