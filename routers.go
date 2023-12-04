@@ -2,6 +2,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
@@ -18,14 +19,22 @@ func HandlerFuncDemo() {
 }
 
 func HandlerFuncDemo1(c *gin.Context) {
-	c.JSON(http.StatusOK, map[string]any{"hello": "world"})
+	hello := HelloStruct{}
+	if err := c.ShouldBind(&hello); err != nil {
+		fmt.Printf("err: %v\n", err)
+	}
+	c.JSON(http.StatusOK, hello)
 }
 
 func HandlerFuncDemo2(c *gin.Context) HelloStruct {
 	return HelloStruct{Hello: "world"}
 }
 
-func HandlerFuncDemo3(hello HelloStruct) HelloStruct {
+func HandlerFuncDemo3(c *gin.Context, hello HelloStruct) HelloStruct {
+	return HelloStruct{Hello: hello.Hello}
+}
+
+func HandlerFuncDemo4(hello *HelloStruct) HelloStruct {
 	return HelloStruct{Hello: hello.Hello}
 }
 
@@ -36,15 +45,23 @@ func GetRouters() []gs.Router {
 			Children: []gs.Router{
 				{
 					Path:     "/test1",
+					Method:   gs.GET | gs.POST,
 					Handlers: gs.PackageHandlers(HandlerFuncDemo, HandlerFuncDemo1),
 				},
 				{
 					Path:     "/test2",
+					Method:   gs.GET | gs.POST,
 					Handlers: gs.PackageHandlers(HandlerFuncDemo2),
 				},
 				{
 					Path:     "/test3",
+					Method:   gs.GET | gs.POST,
 					Handlers: gs.PackageHandlers(HandlerFuncDemo3),
+				},
+				{
+					Path:     "/test4",
+					Method:   gs.GET | gs.POST,
+					Handlers: gs.PackageHandlers(HandlerFuncDemo4),
 				},
 			},
 		},

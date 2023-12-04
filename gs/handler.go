@@ -51,7 +51,7 @@ func packageHandler(function any, paramTypes []reflect.Type, resultTypes []refle
 				if err := c.ShouldBind(param.Interface()); err != nil {
 					panic(err)
 				}
-				params = append(params, param)
+				params = append(params, param.Elem())
 			}
 		}
 		results := callFunction(reflect.ValueOf(function), params...)
@@ -61,9 +61,9 @@ func packageHandler(function any, paramTypes []reflect.Type, resultTypes []refle
 	}
 }
 
-// functions:
-// Parameters can include *gin.Context and request struct.
-// No result or return gs.IResponse
+// functions need to meet some conditions:
+// (1) Parameters can include *gin.Context and request struct.
+// (2) No result or return gs.IResponse
 func PackageHandlers(functions ...any) []gin.HandlerFunc {
 	handlers := make([]gin.HandlerFunc, 0, len(functions))
 	for _, function := range functions {
