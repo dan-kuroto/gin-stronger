@@ -40,6 +40,7 @@ type ginEngineOrGroup interface {
 	Any(relativePath string, handlers ...gin.HandlerFunc) gin.IRoutes
 	Group(relativePath string, handlers ...gin.HandlerFunc) *gin.RouterGroup
 	Handle(httpMethod, relativePath string, handlers ...gin.HandlerFunc) gin.IRoutes
+	Use(middleware ...gin.HandlerFunc) gin.IRoutes
 }
 
 func handleRouter(router ginEngineOrGroup, gsRouter *Router) {

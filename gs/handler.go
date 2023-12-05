@@ -9,7 +9,9 @@ import (
 
 var ginContextType = reflect.TypeOf(&gin.Context{})
 
-type RecoveryFunc[T any] func(c *gin.Context, err T)
+type PanicHandler[T any] func(c *gin.Context, err T)
+
+var panicHandlers []any
 
 func getFunctionParamTypes(funcType reflect.Type) []reflect.Type {
 	numIn := funcType.NumIn()
@@ -95,6 +97,21 @@ func PackageHandlers(functions ...any) []gin.HandlerFunc {
 // Register recovery function for specific type
 //
 // ATTENSION: You should call it before register router handlers!!!
-func UsePanicHandler[T any](errExample T, handler RecoveryFunc[T]) {
-	// TODO ...
+// TODO: 改成engine&RouterGroup都能用
+// NOTE: 目前是按Use的顺序来,且只会调用一个,试试换成直接传列表
+func UsePanicHandler[T any](engine *gin.Engine, handler PanicHandler[T]) {
+	panicHandlers = append(panicHandlers, handler)
+
+	engine.Use(gin.CustomRecovery(func(c *gin.Context, err any) {
+		errValue := reflect.ValueOf(err)
+		for _, handler := range panicHandlers {
+			errType := getFunctionParamTypes(reflect.TypeOf(handler))[1]
+			if errValue.CanConvert(errType) {
+				handlerValue := reflect.ValueOf(handler)
+				callFunction(handlerValue, reflect.ValueOf(c), errValue)
+				break
+			}
+		}
+		c.Next()
+	}))
 }
