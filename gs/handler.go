@@ -9,10 +9,6 @@ import (
 
 var ginContextType = reflect.TypeOf(&gin.Context{})
 
-type PanicHandler[T any] func(c *gin.Context, err T)
-
-var panicHandlers []any
-
 func getFunctionParamTypes(funcType reflect.Type) []reflect.Type {
 	numIn := funcType.NumIn()
 	types := make([]reflect.Type, 0, numIn)
@@ -94,24 +90,26 @@ func PackageHandlers(functions ...any) []gin.HandlerFunc {
 	return handlers
 }
 
-// Register recovery function for specific type
+// Register recovery function for specific type.
 //
-// ATTENSION: You should call it before register router handlers!!!
-// TODO: 改成engine&RouterGroup都能用
-// NOTE: 目前是按Use的顺序来,且只会调用一个,试试换成直接传列表
-func UsePanicHandler[T any](engine *gin.Engine, handler PanicHandler[T]) {
-	panicHandlers = append(panicHandlers, handler)
-
-	engine.Use(gin.CustomRecovery(func(c *gin.Context, err any) {
+// 'handlers' element must be func(c *gin.Context, err T), T is a certain type.
+//
+// ATTENTION: panic handler is based on defer&recover, so it's always the last
+// to be called, regardless of the order in 'gs.Router.MiddleWares'.
+func PackagePanicHandler(handlers ...any) gin.HandlerFunc {
+	errTypes := make([]reflect.Type, 0, len(handlers))
+	for _, handler := range handlers {
+		errTypes = append(errTypes, getFunctionParamTypes(reflect.TypeOf(handler))[1])
+	}
+	return gin.CustomRecovery(func(c *gin.Context, err any) {
 		errValue := reflect.ValueOf(err)
-		for _, handler := range panicHandlers {
-			errType := getFunctionParamTypes(reflect.TypeOf(handler))[1]
+		for i, errType := range errTypes {
 			if errValue.CanConvert(errType) {
-				handlerValue := reflect.ValueOf(handler)
+				handlerValue := reflect.ValueOf(handlers[i])
 				callFunction(handlerValue, reflect.ValueOf(c), errValue)
 				break
 			}
 		}
 		c.Next()
-	}))
+	})
 }

@@ -23,9 +23,13 @@ const (
 
 type Router struct {
 	Path string
-	// default value is gs.GET
-	Method   HttpMethod
+	// invalid for router group. default value is gs.GET
+	Method HttpMethod
+	// valid for router group
+	MiddleWares []gin.HandlerFunc
+	// invalid for router group
 	Handlers []gin.HandlerFunc
+	// if len(Children) != 0, it is a router group
 	Children []Router
 }
 
@@ -84,6 +88,9 @@ func UseRouter(router ginEngineOrGroup, gsRouter *Router) {
 		handleRouter(router, gsRouter)
 	} else {
 		group := router.Group(gsRouter.Path)
+		if len(gsRouter.MiddleWares) != 0 {
+			group.Use(gsRouter.MiddleWares...)
+		}
 		for _, subRouter := range gsRouter.Children {
 			UseRouter(group, &subRouter)
 		}
