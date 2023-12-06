@@ -13,12 +13,10 @@ type HelloStruct struct {
 }
 
 func HandlerDemo1(hello *HelloStruct) HelloStruct {
-	panic("panic demo~")
 	return HelloStruct{Hello: hello.Hello}
 }
 
 func HandlerDemo2(c *gin.Context, hello HelloStruct) HelloStruct {
-	panic(1)
 	return HelloStruct{Hello: hello.Hello}
 }
 

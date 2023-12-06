@@ -44,11 +44,20 @@ func packageHandler(function any, paramTypes []reflect.Type, resultTypes []refle
 			if paramType == ginContextType {
 				params = append(params, reflect.ValueOf(c))
 			} else {
-				param := reflect.New(paramType)
+				var param reflect.Value
+				if paramType.Kind() == reflect.Ptr {
+					param = reflect.New(paramType.Elem())
+				} else {
+					param = reflect.New(paramType)
+				}
 				if err := c.ShouldBind(param.Interface()); err != nil {
 					panic(err)
 				}
-				params = append(params, param.Elem())
+				if paramType.Kind() == reflect.Ptr {
+					params = append(params, param)
+				} else {
+					params = append(params, param.Elem())
+				}
 			}
 		}
 		results := callFunction(reflect.ValueOf(function), params...)
