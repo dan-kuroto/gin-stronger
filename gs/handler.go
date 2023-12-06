@@ -106,7 +106,7 @@ func PackagePanicHandler(handlers ...any) gin.HandlerFunc {
 		for i, errType := range errTypes {
 			if errValue.CanConvert(errType) {
 				handlerValue := reflect.ValueOf(handlers[i])
-				callFunction(handlerValue, reflect.ValueOf(c), errValue)
+				callFunction(handlerValue, reflect.ValueOf(c), errValue.Convert(errType))
 				break
 			}
 		}
