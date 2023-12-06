@@ -7,11 +7,14 @@ import (
 )
 
 func init() {
+	gs.PrintBanner()
 	gs.InitConfigDefault()
+	if gs.Config.Gin.Release {
+		gin.SetMode(gin.ReleaseMode)
+	}
 }
 
 func main() {
-	// TODO: 最后的bug,struct变量为指针时,如果没有请求体,就会报错,但我认为应该给一个零值的!
 	engine := gin.Default()
 
 	gs.UseRouters(engine, GetRouters())
