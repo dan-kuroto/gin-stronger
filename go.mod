@@ -1,6 +1,6 @@
 module github.com/dan-kuroto/gin-stronger
 
-go 1.21.2
+go 1.21.0
 
 require (
 	github.com/gin-gonic/gin v1.9.1
