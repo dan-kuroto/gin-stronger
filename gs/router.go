@@ -97,7 +97,7 @@ func UseRouter(router ginEngineOrGroup, gsRouter *Router) {
 	}
 }
 
-func UseRouters(router ginEngineOrGroup, gsRouters []Router) {
+func UseRouters(router ginEngineOrGroup, gsRouters ...Router) {
 	for _, gsRouter := range gsRouters {
 		UseRouter(router, &gsRouter)
 	}
