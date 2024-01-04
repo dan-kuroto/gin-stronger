@@ -13,6 +13,12 @@ import (
 type IConfiguration interface {
 	GetActiveEnv() string
 	ParseCmdParams()
+	GetSnowFlakeConfig() SnowFlakeConfig
+}
+
+type SnowFlakeConfig struct {
+	DataCenterId int64 `yaml:"data-center-id"`
+	MachineId    int64 `yaml:"machine-id"`
 }
 
 type Configuration struct {
@@ -32,18 +38,15 @@ type Configuration struct {
 		Database  string `yaml:"database"`
 		DebugMode bool   `yaml:"debug-mode"`
 	} `yaml:"mysql"`
-	SnowFlake struct {
-		DataCenterId int64 `yaml:"data-center-id"`
-		MachineId    int64 `yaml:"machine-id"`
-	} `yaml:"snow-flake"`
+	SnowFlake SnowFlakeConfig `yaml:"snow-flake"`
 }
 
 // default config instance
-var Config Configuration
+var Config IConfiguration
 
 // It is shorthand for gs.InitConfig(&gs.Config)
 func InitConfigDefault() {
-	InitConfig(&Config)
+	InitConfig(&Configuration{})
 }
 
 // Load config from application.yml, application-{env}.yml and cmd parameters.
@@ -69,6 +72,8 @@ func InitConfig[T IConfiguration](config T) {
 	}
 	// override by cmd parameters
 	config.ParseCmdParams()
+
+	Config = config
 }
 
 func (config *Configuration) GetActiveEnv() string {
@@ -98,4 +103,8 @@ func (config *Configuration) GetGinAddr() string {
 	} else {
 		return fmt.Sprintf("%s:%d", config.Gin.Host, config.Gin.Port)
 	}
+}
+
+func (config *Configuration) GetSnowFlakeConfig() SnowFlakeConfig {
+	return config.SnowFlake
 }
