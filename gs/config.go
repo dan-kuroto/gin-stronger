@@ -13,12 +13,14 @@ import (
 type IConfiguration interface {
 	GetActiveEnv() string
 	ParseCmdParams()
+	SolveDefaultValue()
 	GetSnowFlakeConfig() SnowFlakeConfig
 }
 
 type SnowFlakeConfig struct {
 	DataCenterId int64 `yaml:"data-center-id"`
 	MachineId    int64 `yaml:"machine-id"`
+	StartStmp    int64 `yaml:"start-stmp"`
 }
 
 type Configuration struct {
@@ -98,10 +100,15 @@ func (config *Configuration) ParseCmdParams() {
 }
 
 func (config *Configuration) GetGinAddr() string {
+	return fmt.Sprintf("%s:%d", config.Gin.Host, config.Gin.Port)
+}
+
+func (config *Configuration) SolveDefaultValue() {
 	if config.Gin.Port == 0 {
-		return fmt.Sprintf("%s:%d", config.Gin.Host, 8080)
-	} else {
-		return fmt.Sprintf("%s:%d", config.Gin.Host, config.Gin.Port)
+		config.Gin.Port = 5480
+	}
+	if config.SnowFlake.StartStmp == 0 {
+		config.SnowFlake.StartStmp = 1626779686000
 	}
 }
 

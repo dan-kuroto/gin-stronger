@@ -2,7 +2,6 @@ package gs
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"sync"
 	"time"
@@ -17,8 +16,6 @@ type IdGenerator[T IdType] interface {
 }
 
 const (
-	// TODO: 把这个也改成yml文件配置,但是gs-cli自动配置为诗夜初次发动态时间,就可以了
-	SNOW_FLAKE_START_STMP         int64 = 1626779686000
 	SNOW_FLAKE_SEQUENCE_BIT       int64 = 12
 	SNOW_FLAKE_MACHINE_BIT        int64 = 5
 	SNOW_FLAKE_DATACENTER_BIT     int64 = 5
@@ -49,7 +46,7 @@ func (s *snowFlake) NextId() int64 {
 
 	currStmp := getNewStmp()
 	if currStmp < s.lastStmp {
-		log.Println("Clock moved backwards. Refusing to generate id")
+		fmt.Println("Clock moved backwards. Refusing to generate id")
 		os.Exit(1)
 	} else if currStmp == s.lastStmp {
 		s.sequence = (s.sequence + 1) & SNOW_FLAKE_MAX_SEQUENCE
@@ -61,7 +58,7 @@ func (s *snowFlake) NextId() int64 {
 	}
 	s.lastStmp = currStmp
 
-	return (currStmp-SNOW_FLAKE_START_STMP)<<SNOW_FLAKE_TIMESTMP_LEFT |
+	return (currStmp-snowflake.StartStmp)<<SNOW_FLAKE_TIMESTMP_LEFT |
 		snowflake.DataCenterId<<SNOW_FLAKE_DATACENTER_LEFT |
 		snowflake.MachineId<<SNOW_FLAKE_MACHINE_LEFT |
 		s.sequence
