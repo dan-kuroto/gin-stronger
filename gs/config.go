@@ -74,6 +74,8 @@ func InitConfig[T IConfiguration](config T) {
 	}
 	// override by cmd parameters
 	config.ParseCmdParams()
+	// set default values
+	config.SolveDefaultValue()
 
 	Config = config
 }
