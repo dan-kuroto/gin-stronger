@@ -149,3 +149,8 @@ func RunApp[T IConfiguration](config T) {
 
 	engine.Run(Config.GetGinAddr())
 }
+
+// It is shorthand for gs.RunApp(&gs.Configuration{})
+func RunAppDefault() {
+	RunApp(&Configuration{})
+}
