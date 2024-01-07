@@ -21,6 +21,9 @@ const (
 	Any     HttpMethod = 0b111111111
 )
 
+var rootRouter = Router{Path: ""}
+var staticMap map[string]string
+
 type Router struct {
 	Path string
 	// invalid for router group. default value is gs.GET
@@ -45,6 +48,10 @@ type ginEngineOrGroup interface {
 	Group(relativePath string, handlers ...gin.HandlerFunc) *gin.RouterGroup
 	Handle(httpMethod, relativePath string, handlers ...gin.HandlerFunc) gin.IRoutes
 	Use(middleware ...gin.HandlerFunc) gin.IRoutes
+}
+
+type Controller interface {
+	GetRouter() Router
 }
 
 func handleRouter(router ginEngineOrGroup, gsRouter *Router) {
@@ -83,7 +90,7 @@ func handleRouter(router ginEngineOrGroup, gsRouter *Router) {
 	}
 }
 
-func UseRouter(router ginEngineOrGroup, gsRouter *Router) {
+func addRouter(router ginEngineOrGroup, gsRouter *Router) {
 	if len(gsRouter.Children) == 0 {
 		handleRouter(router, gsRouter)
 	} else {
@@ -92,19 +99,53 @@ func UseRouter(router ginEngineOrGroup, gsRouter *Router) {
 			group.Use(gsRouter.MiddleWares...)
 		}
 		for _, subRouter := range gsRouter.Children {
-			UseRouter(group, &subRouter)
+			addRouter(group, &subRouter)
 		}
 	}
 }
 
-func UseRouters(router ginEngineOrGroup, gsRouters ...Router) {
-	for _, gsRouter := range gsRouters {
-		UseRouter(router, &gsRouter)
+func initStatic(engine *gin.Engine) {
+	for urlPath, filePath := range staticMap {
+		engine.Static(urlPath, filePath)
 	}
 }
 
-func RegisterStatic(router *gin.Engine, staticMap map[string]string) {
-	for urlPath, filePath := range staticMap {
-		router.Static(urlPath, filePath)
+// Set global URL preffix.
+// Has no effect on the prefix of `RegisterStatic`.
+func SetGlobalPreffix(preffix string) {
+	rootRouter.Path = preffix
+}
+
+func AddGlobalMiddleware(middlewares ...gin.HandlerFunc) {
+	rootRouter.MiddleWares = append(rootRouter.MiddleWares, middlewares...)
+}
+
+func UseController(controller Controller) {
+	rootRouter.Children = append(rootRouter.Children, controller.GetRouter())
+}
+
+// Register static files. `url2path` is the mapping of url to file path
+// (directory path is supported).
+//
+// It won't be affected by `SetGlobalPreffix`.
+func RegisterStatic(url2path map[string]string) {
+	for urlPath, filePath := range url2path {
+		staticMap[urlPath] = filePath
 	}
+}
+
+func RunApp[T IConfiguration](config T) {
+	printBanner()
+	initConfig(config)
+
+	if Config.GetGinRelease() {
+		gin.SetMode(gin.ReleaseMode)
+	}
+
+	engine := gin.Default()
+
+	addRouter(engine, &rootRouter)
+	initStatic(engine)
+
+	engine.Run(Config.GetGinAddr())
 }
