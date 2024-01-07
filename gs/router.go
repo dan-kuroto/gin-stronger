@@ -120,7 +120,7 @@ func AddGlobalMiddleware(middlewares ...gin.HandlerFunc) {
 	rootRouter.MiddleWares = append(rootRouter.MiddleWares, middlewares...)
 }
 
-func UseController(router ginEngineOrGroup, controller Controller) {
+func UseController(controller Controller) {
 	rootRouter.Children = append(rootRouter.Children, controller.GetRouter())
 }
 
