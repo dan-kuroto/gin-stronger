@@ -12,6 +12,8 @@ import (
 
 type IConfiguration interface {
 	GetActiveEnv() string
+	GetGinRelease() bool
+	GetGinAddr() string
 	ParseCmdParams()
 	SolveDefaultValue()
 	GetSnowFlakeConfig() SnowFlakeConfig
@@ -46,14 +48,9 @@ type Configuration struct {
 // default config instance
 var Config IConfiguration
 
-// It is shorthand for gs.InitConfig(&gs.Config)
-func InitConfigDefault() {
-	InitConfig(&Configuration{})
-}
-
 // Load config from application.yml, application-{env}.yml and cmd parameters.
 // (`env` is given by application.yml)
-func InitConfig[T IConfiguration](config T) {
+func initConfig[T IConfiguration](config T) {
 	// init by application.yml
 	data, err := os.ReadFile("application.yml")
 	if err != nil {
@@ -78,6 +75,7 @@ func InitConfig[T IConfiguration](config T) {
 	config.SolveDefaultValue()
 
 	Config = config
+	log.Println("config load complete")
 }
 
 func (config *Configuration) GetActiveEnv() string {
@@ -98,7 +96,10 @@ func (config *Configuration) ParseCmdParams() {
 	if *port != 0 {
 		config.Gin.Port = *port
 	}
-	log.Println("config load complete")
+}
+
+func (config *Configuration) GetGinRelease() bool {
+	return config.Gin.Release
 }
 
 func (config *Configuration) GetGinAddr() string {
