@@ -22,7 +22,7 @@ const (
 )
 
 var rootRouter = Router{Path: ""}
-var staticMap map[string]string
+var staticMap = make(map[string]string)
 
 type Router struct {
 	Path string
