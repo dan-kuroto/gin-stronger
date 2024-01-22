@@ -7,6 +7,7 @@ import (
 )
 
 type HttpMethod uint16
+type StaticMapFunc func() map[string]string
 
 const (
 	GET     HttpMethod = 0b000000001
@@ -22,7 +23,7 @@ const (
 )
 
 var rootRouter = Router{Path: ""}
-var staticMap = make(map[string]string)
+var staticMapFunc StaticMapFunc
 
 type Router struct {
 	Path string
@@ -105,7 +106,7 @@ func addRouter(router ginEngineOrGroup, gsRouter *Router) {
 }
 
 func initStatic(engine *gin.Engine) {
-	for urlPath, filePath := range staticMap {
+	for urlPath, filePath := range staticMapFunc() {
 		engine.Static(urlPath, filePath)
 	}
 }
@@ -128,10 +129,8 @@ func UseController(controller Controller) {
 // (directory path is supported).
 //
 // It won't be affected by `SetGlobalPreffix`.
-func RegisterStatic(url2path map[string]string) {
-	for urlPath, filePath := range url2path {
-		staticMap[urlPath] = filePath
-	}
+func SetStatic(getter StaticMapFunc) {
+	staticMapFunc = getter
 }
 
 func RunApp[T IConfiguration](config T) {
