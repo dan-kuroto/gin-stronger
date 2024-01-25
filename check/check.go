@@ -7,12 +7,11 @@ type Checker struct {
 func CheckParam[T any](checker *Checker, name string, value T, checkFuncs ...CheckFunc[T]) {
 	for _, checkFunc := range checkFuncs {
 		if errTpl := checkFunc(value); errTpl != "" {
-			checker.SolveError(execErrTpl(errTpl, name, value))
+			checker.SolveError(execErrorTemplate(errTpl, name, value))
 		}
 	}
 }
 
-// TODO: 每个函数加注释
 func CheckParamCustom(checker *Checker, condition bool, errMsg string) {
 	if !condition {
 		checker.SolveError(errMsg)
@@ -20,4 +19,8 @@ func CheckParamCustom(checker *Checker, condition bool, errMsg string) {
 }
 
 // Return error message template if value is invalid, otherwise return empty string.
+//
+// This template uses the following placeholders:
+// - {{.name}} means the parameter name.
+// - {{.value}} means the parameter value.
 type CheckFunc[T any] func(value T) (errTpl string)
