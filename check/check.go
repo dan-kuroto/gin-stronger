@@ -24,3 +24,22 @@ func CheckParamCustom(checker *Checker, condition bool, errMsg string) {
 // - {{.name}} means the parameter name.
 // - {{.value}} means the parameter value.
 type CheckFunc[T any] func(value T) (errTpl string)
+
+func NotEmptyStr(value string) (errTpl string) {
+	if len(value) == 0 {
+		return "{{.name}} must not be empty!"
+	} else {
+		return ""
+	}
+}
+
+func NotEmptySlice[T any](value []T) (errTpl string) {
+	if len(value) == 0 {
+		return "{{.name}} must not be empty!"
+	} else {
+		return ""
+	}
+}
+
+// TODO: NotBlank, InRange, Eq, Neq, Gt, Ge, Lt, Le, In, NotIn
+//       (InRange是指范围区间，In/NotIn是枚举值)
