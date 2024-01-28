@@ -1,45 +1,233 @@
 package check
 
+import (
+	"fmt"
+	"net/mail"
+	"regexp"
+	"strings"
+)
+
 type Checker struct {
-	SolveError func(errMsg string)
+	SolveError func(err error)
+}
+
+type Data[T any] struct {
+	Name  string
+	Value T
+}
+
+type CheckFunc[T any] func(data Data[T]) error
+
+type number interface {
+	int | int8 | int16 | int32 | int64 |
+		uint | uint8 | uint16 | uint32 | uint64 |
+		float32 | float64
+}
+
+type orderable interface {
+	number | rune | string
 }
 
 func CheckParam[T any](checker *Checker, name string, value T, checkFuncs ...CheckFunc[T]) {
+	data := Data[T]{Name: name, Value: value}
 	for _, checkFunc := range checkFuncs {
-		if errTpl := checkFunc(value); errTpl != "" {
-			checker.SolveError(execErrorTemplate(errTpl, name, value))
+		if err := checkFunc(data); err != nil {
+			checker.SolveError(err)
 		}
 	}
 }
 
-func CheckParamCustom(checker *Checker, condition bool, errMsg string) {
+func SimpleCheck(checker *Checker, condition bool, err error) {
 	if !condition {
-		checker.SolveError(errMsg)
+		checker.SolveError(err)
 	}
 }
 
-// Return error message template if value is invalid, otherwise return empty string.
+func NotNil[T any](data Data[*T]) error {
+	if data.Value == nil {
+		return fmt.Errorf("`%s` is required!", data.Name)
+	} else {
+		return nil
+	}
+}
+
+func NotEmptyStr(data Data[string]) error {
+	if len(data.Value) == 0 {
+		return fmt.Errorf("`%s` must not be empty!", data.Name)
+	} else {
+		return nil
+	}
+}
+
+func NotEmptyList[T any](data Data[[]T]) error {
+	if len(data.Value) == 0 {
+		return fmt.Errorf("`%s` must not be empty!", data.Name)
+	} else {
+		return nil
+	}
+}
+
+func NotEmptyMap[K comparable, V any](data Data[map[K]V]) error {
+	if len(data.Value) == 0 {
+		return fmt.Errorf("`%s` must not be empty!", data.Name)
+	} else {
+		return nil
+	}
+}
+
+func NotBlank(data Data[string]) error {
+	if strings.TrimSpace(data.Value) == "" {
+		return fmt.Errorf("`%s` must not be blank!", data.Name)
+	} else {
+		return nil
+	}
+}
+
+// check whether value consists of 0-9
+func IsNumeric(data Data[string]) error {
+	for _, ch := range data.Value {
+		if ch < '0' || ch > '9' {
+			return fmt.Errorf("`%s` must be numeric!", data.Name)
+		}
+	}
+	return nil
+}
+
+// check whether value is a email
+func IsEmail(data Data[string]) error {
+	if _, err := mail.ParseAddress(data.Value); err != nil {
+		return fmt.Errorf("`%s` is not a valid email!", data.Name)
+	}
+	return nil
+}
+
+// generate a CheckFunc to check whether value in range of [min, max]
 //
-// This template uses the following placeholders:
-// - {{.name}} means the parameter name.
-// - {{.value}} means the parameter value.
-type CheckFunc[T any] func(value T) (errTpl string)
-
-func NotEmptyStr(value string) (errTpl string) {
-	if len(value) == 0 {
-		return "{{.name}} must not be empty!"
-	} else {
-		return ""
+// (min <= value <= max)
+func InRange[T number](min, max T) CheckFunc[T] {
+	return func(data Data[T]) error {
+		if data.Value < min || data.Value > max {
+			return fmt.Errorf("`%s` must be in range of [%v, %v]!", data.Name, min, max)
+		} else {
+			return nil
+		}
 	}
 }
 
-func NotEmptySlice[T any](value []T) (errTpl string) {
-	if len(value) == 0 {
-		return "{{.name}} must not be empty!"
-	} else {
-		return ""
+// generate a CheckFunc to check whether value is equal to expect
+//
+// (value == expect)
+func Eq[T comparable](expect T) CheckFunc[T] {
+	return func(data Data[T]) error {
+		if data.Value != expect {
+			return fmt.Errorf("`%s` must be equal to %v!", data.Name, expect)
+		} else {
+			return nil
+		}
 	}
 }
 
-// TODO: NotBlank, InRange, Eq, Neq, Gt, Ge, Lt, Le, In, NotIn
-//       (InRange是指范围区间，In/NotIn是枚举值)
+// generate a CheckFunc to check whether value is not equal to expect
+//
+// (value != expect)
+func Neq[T comparable](expect T) CheckFunc[T] {
+	return func(data Data[T]) error {
+		if data.Value == expect {
+			return fmt.Errorf("`%s` must not be equal to %v!", data.Name, expect)
+		} else {
+			return nil
+		}
+	}
+}
+
+// generate a CheckFunc to check whether value is greater than expect
+//
+// (value > expect)
+func Gt[T orderable](expect T) CheckFunc[T] {
+	return func(data Data[T]) error {
+		if data.Value <= expect {
+			return fmt.Errorf("`%s` must be greater than %v!", data.Name, expect)
+		} else {
+			return nil
+		}
+	}
+}
+
+// generate a CheckFunc to check whether value is greater than or equal to expect
+//
+// (value >= expect)
+func Ge[T orderable](expect T) CheckFunc[T] {
+	return func(data Data[T]) error {
+		if data.Value < expect {
+			return fmt.Errorf("`%s` must be greater than or equal to %v!", data.Name, expect)
+		} else {
+			return nil
+		}
+	}
+}
+
+// generate a CheckFunc to check whether value is less than expect
+//
+// (value < expect)
+func Lt[T orderable](expect T) CheckFunc[T] {
+	return func(data Data[T]) error {
+		if data.Value >= expect {
+			return fmt.Errorf("`%s` must be less than %v!", data.Name, expect)
+		} else {
+			return nil
+		}
+	}
+}
+
+// generate a CheckFunc to check whether value is less than or equal to expect
+//
+// (value <= expect)
+func Le[T orderable](expect T) CheckFunc[T] {
+	return func(data Data[T]) error {
+		if data.Value > expect {
+			return fmt.Errorf("`%s` must be less than or equal to %v!", data.Name, expect)
+		} else {
+			return nil
+		}
+	}
+}
+
+// generate a CheckFunc to check whether value is in expect
+func In[T comparable](expect ...T) CheckFunc[T] {
+	return func(data Data[T]) error {
+		for _, v := range expect {
+			if data.Value == v {
+				return nil
+			}
+		}
+		return fmt.Errorf("`%s` must be in %v!", data.Name, expect)
+	}
+}
+
+// generate a CheckFunc to check whether value is not in expect
+func NotIn[T comparable](expect ...T) CheckFunc[T] {
+	return func(data Data[T]) error {
+		for _, v := range expect {
+			if data.Value == v {
+				return fmt.Errorf("`%s` must not be in %v!", data.Name, expect)
+			}
+		}
+		return nil
+	}
+}
+
+// generate a CheckFunc to check whether value matches expect (expect is a regexp)
+func Match(expect string) CheckFunc[string] {
+	return func(data Data[string]) error {
+		matched, err := regexp.MatchString(expect, data.Value)
+		if err != nil {
+			return err
+		}
+		if !matched {
+			return fmt.Errorf("`%s` must match /%s/!", data.Name, expect)
+		}
+		return nil
+	}
+}
+
+// TODO: string输出的时候要加引号、还有list输出的时候要加逗号
