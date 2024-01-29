@@ -37,8 +37,32 @@ func ToString(data any) string {
 		}
 		sb.WriteString("}")
 		return sb.String()
-	// TODO: 1. interface&struct 2. config: 是否换行indent/pointer是否&/...(可参考objprint)
+	case reflect.Interface, reflect.Struct:
+		// TODO: 类似前面map的处理，但是要加上类名，且key不加引号了
+		return fmt.Sprintf("%#v", data)
+	case reflect.Chan:
+		return fmt.Sprintf("<%s len=%d cap=%d ptr=%#x>", typeToString(value.Type()), value.Len(), value.Cap(), value.Pointer())
+	case reflect.Func:
+		// TODO
+		return fmt.Sprintf("%#v", data)
 	default:
-		return fmt.Sprint(data)
+		return fmt.Sprintf("%#v", data)
 	}
 }
+
+func typeToString(type_ reflect.Type) string {
+	switch type_.Kind() {
+	case reflect.Pointer:
+		return "&" + typeToString(type_.Elem())
+	case reflect.Array, reflect.Slice:
+		return fmt.Sprintf("[]%s", typeToString(type_.Elem()))
+	case reflect.Map:
+		return fmt.Sprintf("map[%s, %s]", typeToString(type_.Key()), typeToString(type_.Elem()))
+	case reflect.Chan:
+		return fmt.Sprintf("chan[%s]", typeToString(type_.Elem()))
+	default:
+		return type_.String()
+	}
+}
+
+// TODO: config: 是否换行indent/pointer是否&/...(可参考objprint)
