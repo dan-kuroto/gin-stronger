@@ -3,8 +3,11 @@ package check
 import (
 	"fmt"
 	"net/mail"
+	"net/url"
 	"regexp"
 	"strings"
+
+	"github.com/dan-kuroto/gin-stronger/utils"
 )
 
 type Checker struct {
@@ -93,10 +96,18 @@ func IsNumeric(data Data[string]) error {
 	return nil
 }
 
-// check whether value is a email
+// check whether value is a valid email
 func IsEmail(data Data[string]) error {
 	if _, err := mail.ParseAddress(data.Value); err != nil {
 		return fmt.Errorf("`%s` is not a valid email!", data.Name)
+	}
+	return nil
+}
+
+// check whether value is a valid URL
+func IsURL(data Data[string]) error {
+	if _, err := url.ParseRequestURI(data.Value); err != nil {
+		return fmt.Errorf("`%s` is not a valid URL!", data.Name)
 	}
 	return nil
 }
@@ -120,7 +131,7 @@ func InRange[T number](min, max T) CheckFunc[T] {
 func Eq[T comparable](expect T) CheckFunc[T] {
 	return func(data Data[T]) error {
 		if data.Value != expect {
-			return fmt.Errorf("`%s` must be equal to %v!", data.Name, expect)
+			return fmt.Errorf("`%s` must be equal to %s!", data.Name, utils.ToString(expect))
 		} else {
 			return nil
 		}
@@ -133,7 +144,7 @@ func Eq[T comparable](expect T) CheckFunc[T] {
 func Neq[T comparable](expect T) CheckFunc[T] {
 	return func(data Data[T]) error {
 		if data.Value == expect {
-			return fmt.Errorf("`%s` must not be equal to %v!", data.Name, expect)
+			return fmt.Errorf("`%s` must not be equal to %s!", data.Name, utils.ToString(expect))
 		} else {
 			return nil
 		}
@@ -146,7 +157,7 @@ func Neq[T comparable](expect T) CheckFunc[T] {
 func Gt[T orderable](expect T) CheckFunc[T] {
 	return func(data Data[T]) error {
 		if data.Value <= expect {
-			return fmt.Errorf("`%s` must be greater than %v!", data.Name, expect)
+			return fmt.Errorf("`%s` must be greater than %s!", data.Name, utils.ToString(expect))
 		} else {
 			return nil
 		}
@@ -159,7 +170,7 @@ func Gt[T orderable](expect T) CheckFunc[T] {
 func Ge[T orderable](expect T) CheckFunc[T] {
 	return func(data Data[T]) error {
 		if data.Value < expect {
-			return fmt.Errorf("`%s` must be greater than or equal to %v!", data.Name, expect)
+			return fmt.Errorf("`%s` must be greater than or equal to %s!", data.Name, utils.ToString(expect))
 		} else {
 			return nil
 		}
@@ -172,7 +183,7 @@ func Ge[T orderable](expect T) CheckFunc[T] {
 func Lt[T orderable](expect T) CheckFunc[T] {
 	return func(data Data[T]) error {
 		if data.Value >= expect {
-			return fmt.Errorf("`%s` must be less than %v!", data.Name, expect)
+			return fmt.Errorf("`%s` must be less than %s!", data.Name, utils.ToString(expect))
 		} else {
 			return nil
 		}
@@ -185,7 +196,7 @@ func Lt[T orderable](expect T) CheckFunc[T] {
 func Le[T orderable](expect T) CheckFunc[T] {
 	return func(data Data[T]) error {
 		if data.Value > expect {
-			return fmt.Errorf("`%s` must be less than or equal to %v!", data.Name, expect)
+			return fmt.Errorf("`%s` must be less than or equal to %s!", data.Name, utils.ToString(expect))
 		} else {
 			return nil
 		}
@@ -200,7 +211,7 @@ func In[T comparable](expect ...T) CheckFunc[T] {
 				return nil
 			}
 		}
-		return fmt.Errorf("`%s` must be in %v!", data.Name, expect)
+		return fmt.Errorf("`%s` must be in %s!", data.Name, utils.ToString(expect))
 	}
 }
 
@@ -209,7 +220,7 @@ func NotIn[T comparable](expect ...T) CheckFunc[T] {
 	return func(data Data[T]) error {
 		for _, v := range expect {
 			if data.Value == v {
-				return fmt.Errorf("`%s` must not be in %v!", data.Name, expect)
+				return fmt.Errorf("`%s` must not be in %s!", data.Name, utils.ToString(expect))
 			}
 		}
 		return nil
@@ -229,5 +240,3 @@ func Match(expect string) CheckFunc[string] {
 		return nil
 	}
 }
-
-// TODO: string输出的时候要加引号、还有list输出的时候要加逗号
