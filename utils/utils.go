@@ -43,11 +43,10 @@ func ToString(data any) string {
 		}
 		sb.WriteString("}")
 		return sb.String()
-	case reflect.Interface, reflect.Struct:
-		// TODO: 类似前面map的处理，但是要加上类名，且key不加引号了
-		return fmt.Sprintf("%#v", data)
 	case reflect.Chan:
 		return fmt.Sprintf("<%s len=%d cap=%d ptr=%#x>", typeToString(value.Type()), value.Len(), value.Cap(), value.Pointer())
+	case reflect.Struct:
+		return structToString(value)
 	case reflect.Func:
 		// TODO
 		return fmt.Sprintf("%#v", data)
@@ -67,8 +66,30 @@ func typeToString(type_ reflect.Type) string {
 	case reflect.Chan:
 		return fmt.Sprintf("chan[%s]", typeToString(type_.Elem()))
 	default:
-		return type_.String()
+		if type_.Name() == "" {
+			return "?"
+		} else {
+			return type_.String()
+		}
 	}
 }
 
-// TODO: config: 是否换行indent/pointer是否&/...(可参考objprint)
+func structToString(value reflect.Value) string {
+	var sb strings.Builder
+	sb.WriteString("<")
+	sb.WriteString(typeToString(value.Type()))
+	for i := 0; i < value.NumField(); i++ {
+		field := value.Type().Field(i)
+		if field.IsExported() {
+			sb.WriteString(" ")
+			sb.WriteString(field.Name)
+			sb.WriteString("=")
+			sb.WriteString(ToString(value.Field(i).Interface()))
+		} // TODO: 查一下unexported的有没有办法获取？
+	}
+	sb.WriteString(">")
+	// TODO: 显示method？
+	return sb.String()
+}
+
+// TODO: config: 是否换行indent/pointer是否&/map等容器是否带type/...(可参考objprint)
