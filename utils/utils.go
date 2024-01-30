@@ -12,6 +12,12 @@ func ToString(data any) string {
 	case reflect.String:
 		return fmt.Sprintf("%q", data)
 	case reflect.Pointer:
+		if value.IsNil() {
+			return fmt.Sprintf("<%s nil>", typeToString(value.Type()))
+		}
+		if !value.CanInterface() {
+			return fmt.Sprintf("%#v", data)
+		}
 		return "&" + ToString(value.Elem().Interface())
 	case reflect.Array, reflect.Slice:
 		var sb strings.Builder
@@ -53,7 +59,7 @@ func ToString(data any) string {
 func typeToString(type_ reflect.Type) string {
 	switch type_.Kind() {
 	case reflect.Pointer:
-		return "&" + typeToString(type_.Elem())
+		return "*" + typeToString(type_.Elem())
 	case reflect.Array, reflect.Slice:
 		return fmt.Sprintf("[]%s", typeToString(type_.Elem()))
 	case reflect.Map:
