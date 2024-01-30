@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/dan-kuroto/gin-stronger/utils"
 )
@@ -115,10 +116,37 @@ func IsURL(data Data[string]) error {
 // generate a CheckFunc to check whether value in range of [min, max]
 //
 // (min <= value <= max)
-func InRange[T number](min, max T) CheckFunc[T] {
+func Range[T number](min, max T) CheckFunc[T] {
 	return func(data Data[T]) error {
 		if data.Value < min || data.Value > max {
 			return fmt.Errorf("`%s` must be in range of [%v, %v]!", data.Name, min, max)
+		} else {
+			return nil
+		}
+	}
+}
+
+// generate a CheckFunc to check whether the size of value(slice, array, or map)
+// in range of [min, max]
+//
+// (min <= len(value) <= max)
+func Size[T any](min, max int) CheckFunc[[]T] {
+	return func(data Data[[]T]) error {
+		if len(data.Value) < min || len(data.Value) > max {
+			return fmt.Errorf("`%s` must be in size of [%v, %v]!", data.Name, min, max)
+		} else {
+			return nil
+		}
+	}
+}
+
+// generate a CheckFunc to check whether the length of value(string) in range of [min, max]
+//
+// (min <= utf8.RuneCountInString((value) <= max)
+func Length(min, max int) CheckFunc[string] {
+	return func(data Data[string]) error {
+		if utf8.RuneCountInString(data.Value) < min || utf8.RuneCountInString(data.Value) > max {
+			return fmt.Errorf("`%s` must be in length of [%v, %v]!", data.Name, min, max)
 		} else {
 			return nil
 		}
