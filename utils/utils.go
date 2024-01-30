@@ -75,20 +75,23 @@ func typeToString(type_ reflect.Type) string {
 }
 
 func structToString(value reflect.Value) string {
+	type_ := value.Type()
+
 	var sb strings.Builder
 	sb.WriteString("<")
-	sb.WriteString(typeToString(value.Type()))
+	sb.WriteString(typeToString(type_))
 	for i := 0; i < value.NumField(); i++ {
-		field := value.Type().Field(i)
+		field := type_.Field(i)
 		if field.IsExported() {
 			sb.WriteString(" ")
 			sb.WriteString(field.Name)
 			sb.WriteString("=")
 			sb.WriteString(ToString(value.Field(i).Interface()))
-		} // TODO: 查一下unexported的有没有办法获取？
+		}
 	}
 	sb.WriteString(">")
-	// TODO: 显示method？
+	// TODO: 显示method?(允许换行的时候才显示,现在还不支持indent)
+
 	return sb.String()
 }
 

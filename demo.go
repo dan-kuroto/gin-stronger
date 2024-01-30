@@ -11,7 +11,7 @@ type A struct {
 	Data struct {
 		Age     int
 		Items   []string
-		private string
+		private int
 	}
 }
 
