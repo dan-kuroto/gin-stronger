@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/dan-kuroto/gin-stronger/utils"
+	gp "github.com/dan-kuroto/gin-stronger/go-print"
 )
 
 type A struct {
@@ -16,9 +16,9 @@ type A struct {
 }
 
 func main() {
-	fmt.Println(utils.ToString(struct{ A string }{}))
-	fmt.Println(utils.ToString(A{}))
-	fmt.Println(utils.ToString(func(s string) A {
+	fmt.Println(gp.ToString(struct{ A string }{}))
+	fmt.Println(gp.ToString(A{}))
+	fmt.Println(gp.ToString(func(s string) A {
 		return A{}
 	}))
 }
