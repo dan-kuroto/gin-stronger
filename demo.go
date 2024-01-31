@@ -16,9 +16,10 @@ type A struct {
 }
 
 func main() {
-	fmt.Println(gp.ToString(struct{ A string }{}))
-	fmt.Println(gp.ToString(A{}))
-	fmt.Println(gp.ToString(func(s string) A {
-		return A{}
-	}))
+	var a func() A
+	b := func(s string, b func(int) map[string]A) (A, error) {
+		return A{}, nil
+	}
+	fmt.Println(gp.ToString(a))
+	fmt.Println(gp.ToString(b))
 }

@@ -48,8 +48,7 @@ func ToString(data any) string {
 	case reflect.Struct:
 		return structToString(value)
 	case reflect.Func:
-		// TODO
-		return fmt.Sprintf("%#v", data)
+		return funcToString(value)
 	default:
 		return fmt.Sprintf("%#v", data)
 	}
@@ -65,6 +64,8 @@ func typeToString(type_ reflect.Type) string {
 		return fmt.Sprintf("map[%s, %s]", typeToString(type_.Key()), typeToString(type_.Elem()))
 	case reflect.Chan:
 		return fmt.Sprintf("chan[%s]", typeToString(type_.Elem()))
+	case reflect.Func:
+		return fmt.Sprintf("func[%s -> %s]", funcInTypeString(type_), funcOutTypeString(type_))
 	default:
 		if type_.Name() == "" {
 			return "?"
@@ -72,6 +73,46 @@ func typeToString(type_ reflect.Type) string {
 			return type_.String()
 		}
 	}
+}
+
+func funcInTypeString(type_ reflect.Type) string {
+	numIn := type_.NumIn()
+	if numIn == 0 {
+		return "()"
+	}
+	if numIn == 1 {
+		return typeToString(type_.In(0))
+	}
+	var sb strings.Builder
+	sb.WriteString("(")
+	for i := 0; i < numIn; i++ {
+		sb.WriteString(typeToString(type_.In(i)))
+		if i < numIn-1 {
+			sb.WriteString(", ")
+		}
+	}
+	sb.WriteString(")")
+	return sb.String()
+}
+
+func funcOutTypeString(type_ reflect.Type) string {
+	numOut := type_.NumOut()
+	if numOut == 0 {
+		return "()"
+	}
+	if numOut == 1 {
+		return typeToString(type_.Out(0))
+	}
+	var sb strings.Builder
+	sb.WriteString("(")
+	for i := 0; i < numOut; i++ {
+		sb.WriteString(typeToString(type_.Out(i)))
+		if i < numOut-1 {
+			sb.WriteString(", ")
+		}
+	}
+	sb.WriteString(")")
+	return sb.String()
 }
 
 func structToString(value reflect.Value) string {
@@ -95,4 +136,17 @@ func structToString(value reflect.Value) string {
 	return sb.String()
 }
 
-// TODO: config: 是否换行indent/pointer是否&/map等容器是否带type/...(可参考objprint)
+func funcToString(value reflect.Value) string {
+	var sb strings.Builder
+	sb.WriteString("<")
+	sb.WriteString(typeToString(value.Type()))
+	if value.IsNil() {
+		sb.WriteString(" nil")
+	} else {
+		sb.WriteString(fmt.Sprintf(" ptr=%#x", value.Pointer()))
+	}
+	sb.WriteString(">")
+	return sb.String()
+}
+
+// TODO: config: 是否换行indent/pointer是否&/map等容器是否带type,len,cap,过多省略/...(可参考objprint)
