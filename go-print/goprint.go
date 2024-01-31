@@ -6,14 +6,40 @@ import (
 	"strings"
 )
 
+type Processor struct {
+	// No line breaks when `Indent <= 0`.
+	Indent int
+	// Pointer preffix: such as '&' in `&time.Time{}` and '*' in `*time.Time`.
+	PointerPreffixHide bool
+	// Whether show container(map/array/slice) as a tag.
+	//
+	// If true, example: <map[string, any] :len=3 "a"=1 "b"=<[]int :len=2 items=[1, 2]>>
+	//
+	// Otherwise, example: {"a": 1, "b": {"c": [1, 2, "4"]}}
+	ContainerShowAsTag bool
+	// If `ContainerDisplayNum <= 0`, means infinity.
+	// If `len(data) > ContainerDisplayNum`, extra parts are shown as ellipsis.
+	ContainerDisplayNum int
+	// Only when `Indent > 0`, `StructMethodShow` is valid.
+	StructMethodShow bool
+}
+
+var Default = Processor{
+	Indent: 2,
+}
+
 func ToString(data any) string {
+	return Default.ToString(data)
+}
+
+func (p *Processor) ToString(data any) string {
 	value := reflect.ValueOf(data)
 	switch value.Kind() {
 	case reflect.String:
 		return fmt.Sprintf("%q", data)
 	case reflect.Pointer:
 		if value.IsNil() {
-			return fmt.Sprintf("<%s nil>", typeToString(value.Type()))
+			return fmt.Sprintf("<%s nil>", p.typeToString(value.Type()))
 		}
 		if !value.CanInterface() {
 			return fmt.Sprintf("%#v", data)
@@ -44,28 +70,28 @@ func ToString(data any) string {
 		sb.WriteString("}")
 		return sb.String()
 	case reflect.Chan:
-		return fmt.Sprintf("<%s len=%d cap=%d ptr=%#x>", typeToString(value.Type()), value.Len(), value.Cap(), value.Pointer())
+		return fmt.Sprintf("<%s len=%d cap=%d ptr=%#x>", p.typeToString(value.Type()), value.Len(), value.Cap(), value.Pointer())
 	case reflect.Struct:
-		return structToString(value)
+		return p.structToString(value)
 	case reflect.Func:
-		return funcToString(value)
+		return p.funcToString(value)
 	default:
 		return fmt.Sprintf("%#v", data)
 	}
 }
 
-func typeToString(type_ reflect.Type) string {
+func (p *Processor) typeToString(type_ reflect.Type) string {
 	switch type_.Kind() {
 	case reflect.Pointer:
-		return "*" + typeToString(type_.Elem())
+		return "*" + p.typeToString(type_.Elem())
 	case reflect.Array, reflect.Slice:
-		return fmt.Sprintf("[]%s", typeToString(type_.Elem()))
+		return fmt.Sprintf("[]%s", p.typeToString(type_.Elem()))
 	case reflect.Map:
-		return fmt.Sprintf("map[%s, %s]", typeToString(type_.Key()), typeToString(type_.Elem()))
+		return fmt.Sprintf("map[%s, %s]", p.typeToString(type_.Key()), p.typeToString(type_.Elem()))
 	case reflect.Chan:
-		return fmt.Sprintf("chan[%s]", typeToString(type_.Elem()))
+		return fmt.Sprintf("chan[%s]", p.typeToString(type_.Elem()))
 	case reflect.Func:
-		return fmt.Sprintf("func[%s -> %s]", funcInTypeString(type_), funcOutTypeString(type_))
+		return fmt.Sprintf("func[%s -> %s]", p.funcInTypeString(type_), p.funcOutTypeString(type_))
 	default:
 		if type_.Name() == "" {
 			return "?"
@@ -75,18 +101,18 @@ func typeToString(type_ reflect.Type) string {
 	}
 }
 
-func funcInTypeString(type_ reflect.Type) string {
+func (p *Processor) funcInTypeString(type_ reflect.Type) string {
 	numIn := type_.NumIn()
 	if numIn == 0 {
 		return "()"
 	}
 	if numIn == 1 {
-		return typeToString(type_.In(0))
+		return p.typeToString(type_.In(0))
 	}
 	var sb strings.Builder
 	sb.WriteString("(")
 	for i := 0; i < numIn; i++ {
-		sb.WriteString(typeToString(type_.In(i)))
+		sb.WriteString(p.typeToString(type_.In(i)))
 		if i < numIn-1 {
 			sb.WriteString(", ")
 		}
@@ -95,18 +121,18 @@ func funcInTypeString(type_ reflect.Type) string {
 	return sb.String()
 }
 
-func funcOutTypeString(type_ reflect.Type) string {
+func (p *Processor) funcOutTypeString(type_ reflect.Type) string {
 	numOut := type_.NumOut()
 	if numOut == 0 {
 		return "()"
 	}
 	if numOut == 1 {
-		return typeToString(type_.Out(0))
+		return p.typeToString(type_.Out(0))
 	}
 	var sb strings.Builder
 	sb.WriteString("(")
 	for i := 0; i < numOut; i++ {
-		sb.WriteString(typeToString(type_.Out(i)))
+		sb.WriteString(p.typeToString(type_.Out(i)))
 		if i < numOut-1 {
 			sb.WriteString(", ")
 		}
@@ -115,12 +141,12 @@ func funcOutTypeString(type_ reflect.Type) string {
 	return sb.String()
 }
 
-func structToString(value reflect.Value) string {
+func (p *Processor) structToString(value reflect.Value) string {
 	type_ := value.Type()
 
 	var sb strings.Builder
 	sb.WriteString("<")
-	sb.WriteString(typeToString(type_))
+	sb.WriteString(p.typeToString(type_))
 	for i := 0; i < value.NumField(); i++ {
 		field := type_.Field(i)
 		if field.IsExported() {
@@ -131,15 +157,14 @@ func structToString(value reflect.Value) string {
 		}
 	}
 	sb.WriteString(">")
-	// TODO: 显示method?(允许换行的时候才显示,现在还不支持indent)
 
 	return sb.String()
 }
 
-func funcToString(value reflect.Value) string {
+func (p *Processor) funcToString(value reflect.Value) string {
 	var sb strings.Builder
 	sb.WriteString("<")
-	sb.WriteString(typeToString(value.Type()))
+	sb.WriteString(p.typeToString(value.Type()))
 	if value.IsNil() {
 		sb.WriteString(" nil")
 	} else {
@@ -148,5 +173,3 @@ func funcToString(value reflect.Value) string {
 	sb.WriteString(">")
 	return sb.String()
 }
-
-// TODO: config: 是否换行indent/pointer是否&/map等容器是否带type,len,cap,过多省略/...(可参考objprint)
