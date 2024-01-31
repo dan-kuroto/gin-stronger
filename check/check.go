@@ -7,8 +7,6 @@ import (
 	"regexp"
 	"strings"
 	"unicode/utf8"
-
-	gp "github.com/dan-kuroto/gin-stronger/go-print"
 )
 
 type Checker struct {
@@ -159,7 +157,7 @@ func Length(min, max int) CheckFunc[string] {
 func Eq[T comparable](expect T) CheckFunc[T] {
 	return func(data Data[T]) error {
 		if data.Value != expect {
-			return fmt.Errorf("`%s` must be equal to %s!", data.Name, gp.ToString(expect))
+			return fmt.Errorf("`%s` must be equal to %s!", data.Name, formatter.ToString(expect))
 		} else {
 			return nil
 		}
@@ -172,7 +170,7 @@ func Eq[T comparable](expect T) CheckFunc[T] {
 func Neq[T comparable](expect T) CheckFunc[T] {
 	return func(data Data[T]) error {
 		if data.Value == expect {
-			return fmt.Errorf("`%s` must not be equal to %s!", data.Name, gp.ToString(expect))
+			return fmt.Errorf("`%s` must not be equal to %s!", data.Name, formatter.ToString(expect))
 		} else {
 			return nil
 		}
@@ -185,7 +183,7 @@ func Neq[T comparable](expect T) CheckFunc[T] {
 func Gt[T orderable](expect T) CheckFunc[T] {
 	return func(data Data[T]) error {
 		if data.Value <= expect {
-			return fmt.Errorf("`%s` must be greater than %s!", data.Name, gp.ToString(expect))
+			return fmt.Errorf("`%s` must be greater than %s!", data.Name, formatter.ToString(expect))
 		} else {
 			return nil
 		}
@@ -198,7 +196,7 @@ func Gt[T orderable](expect T) CheckFunc[T] {
 func Ge[T orderable](expect T) CheckFunc[T] {
 	return func(data Data[T]) error {
 		if data.Value < expect {
-			return fmt.Errorf("`%s` must be greater than or equal to %s!", data.Name, gp.ToString(expect))
+			return fmt.Errorf("`%s` must be greater than or equal to %s!", data.Name, formatter.ToString(expect))
 		} else {
 			return nil
 		}
@@ -211,7 +209,7 @@ func Ge[T orderable](expect T) CheckFunc[T] {
 func Lt[T orderable](expect T) CheckFunc[T] {
 	return func(data Data[T]) error {
 		if data.Value >= expect {
-			return fmt.Errorf("`%s` must be less than %s!", data.Name, gp.ToString(expect))
+			return fmt.Errorf("`%s` must be less than %s!", data.Name, formatter.ToString(expect))
 		} else {
 			return nil
 		}
@@ -224,7 +222,7 @@ func Lt[T orderable](expect T) CheckFunc[T] {
 func Le[T orderable](expect T) CheckFunc[T] {
 	return func(data Data[T]) error {
 		if data.Value > expect {
-			return fmt.Errorf("`%s` must be less than or equal to %s!", data.Name, gp.ToString(expect))
+			return fmt.Errorf("`%s` must be less than or equal to %s!", data.Name, formatter.ToString(expect))
 		} else {
 			return nil
 		}
@@ -239,7 +237,7 @@ func In[T comparable](expect ...T) CheckFunc[T] {
 				return nil
 			}
 		}
-		return fmt.Errorf("`%s` must be in %s!", data.Name, gp.ToString(expect))
+		return fmt.Errorf("`%s` must be in %s!", data.Name, formatter.ToString(expect))
 	}
 }
 
@@ -248,7 +246,7 @@ func NotIn[T comparable](expect ...T) CheckFunc[T] {
 	return func(data Data[T]) error {
 		for _, v := range expect {
 			if data.Value == v {
-				return fmt.Errorf("`%s` must not be in %s!", data.Name, gp.ToString(expect))
+				return fmt.Errorf("`%s` must not be in %s!", data.Name, formatter.ToString(expect))
 			}
 		}
 		return nil
