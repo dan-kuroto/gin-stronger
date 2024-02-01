@@ -16,19 +16,26 @@ type A struct {
 }
 
 var f = gp.Formatter{
-	ListIndent:     0,
+	ListIndent:     2,
 	MapIndent:      2,
 	StructIndent:   2,
 	ListDisplayNum: 0,
 	MapDisplayNum:  0,
+	ListShowAsTag:  true,
+	MapShowAsTag:   true,
 }
 
 func main() {
-	fmt.Println(f.ToString(map[string]any{"1": 1, "2": map[string]any{"3": "#"}}))
-	a := &A{Data: struct {
-		Age     int
-		Items   []string
-		private int
-	}{Items: []string{"a", "b", "c"}}}
-	fmt.Println(f.ToString(a))
+	fmt.Println(f.ToString(map[string]any{
+		"1": 1,
+		"2": map[string]any{
+			"3": "4",
+			"5": []any{
+				6,
+				7,
+				[]string{"8", "9"},
+				[]int{},
+			},
+		},
+	}))
 }

@@ -13,12 +13,16 @@ type Formatter struct {
 	MapIndent int
 	// indent for struct
 	StructIndent int
-	// Whether show container(map/array/slice) as a tag.
+	// Whether show array&slice as a tag.
 	//
-	// If true, example: <map[string, any] :len=3 "a"=1 "b"=<[]int :len=2 items=[1, 2]>>
+	// If true, example: <[]int :len=2 items=[1, 2]>
+	// Otherwise, example: [1, 2, "4"]
+	ListShowAsTag bool
+	// Whether show map as a tag.
 	//
-	// Otherwise, example: {"a": 1, "b": {"c": [1, 2, "4"]}}
-	ContainerShowAsTag bool
+	// If true, example: <map[string, any] :len=3 "a"=1>
+	// Otherwise, example: {"a": 1}
+	MapShowAsTag bool
 	// Max number for display items in array&list.
 	// If `ListDisplayNum <= 0`, means infinity.
 	// If `len(data) > ListDisplayNum`, extra parts are shown as ellipsis.
@@ -32,7 +36,7 @@ type Formatter struct {
 }
 
 var Default = Formatter{
-	StructIndent: 2,
+	StructIndent: 2, ListDisplayNum: 100, MapDisplayNum: 100,
 }
 
 func ToString(data any) string {
@@ -79,6 +83,9 @@ func (f *Formatter) listToString(value reflect.Value, layer int) string {
 		displayLength = f.ListDisplayNum
 	}
 
+	if f.ListShowAsTag {
+		sb.WriteString(fmt.Sprintf("<%s :len=%d items=", f.typeToString(value.Type()), value.Len()))
+	}
 	sb.WriteString("[")
 	if displayLength > 0 {
 		if f.ListIndent > 0 {
@@ -102,6 +109,9 @@ func (f *Formatter) listToString(value reflect.Value, layer int) string {
 		appendIndent(&sb, f.ListIndent, layer, false)
 	}
 	sb.WriteString("]")
+	if f.ListShowAsTag {
+		sb.WriteString(">")
+	}
 
 	return sb.String()
 }
@@ -114,7 +124,11 @@ func (f *Formatter) mapToString(value reflect.Value, layer int) string {
 		displayLength = f.MapDisplayNum
 	}
 
-	sb.WriteString("{")
+	if f.MapShowAsTag {
+		sb.WriteString(fmt.Sprintf("<%s :len=%d", f.typeToString(value.Type()), value.Len()))
+	} else {
+		sb.WriteString("{")
+	}
 	if displayLength > 0 {
 		if f.MapIndent > 0 {
 			layer++
@@ -122,14 +136,22 @@ func (f *Formatter) mapToString(value reflect.Value, layer int) string {
 		appendIndent(&sb, f.MapIndent, layer, false)
 		for i, key := range value.MapKeys() {
 			sb.WriteString(f.toString(key.Interface(), layer))
-			sb.WriteString(": ")
+			if f.MapShowAsTag {
+				sb.WriteString("=")
+			} else {
+				sb.WriteString(": ")
+			}
 			sb.WriteString(f.toString(value.MapIndex(key).Interface(), layer))
 			if i < displayLength-1 { // before the last one
-				sb.WriteString(", ")
+				if !f.MapShowAsTag {
+					sb.WriteString(",")
+				}
 				appendIndent(&sb, f.MapIndent, layer, true)
 			} else { // last one
 				if displayLength < length { // need ellipsis
-					sb.WriteString(", ")
+					if !f.MapShowAsTag {
+						sb.WriteString(",")
+					}
 					appendIndent(&sb, f.MapIndent, layer, true)
 					sb.WriteString("...")
 				}
@@ -141,7 +163,11 @@ func (f *Formatter) mapToString(value reflect.Value, layer int) string {
 		}
 		appendIndent(&sb, f.MapIndent, layer, false)
 	}
-	sb.WriteString("}")
+	if f.MapShowAsTag {
+		sb.WriteString(">")
+	} else {
+		sb.WriteString("}")
+	}
 
 	return sb.String()
 }

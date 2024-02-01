@@ -17,3 +17,5 @@ func appendIndent(sb *strings.Builder, indent int, layer int, isSeparate bool) {
 		}
 	}
 }
+
+// BUG: 目前如果几个indent不同（除零之外），在不同类型嵌套的时候会错位……
