@@ -16,13 +16,17 @@ type A struct {
 }
 
 var f = gp.Formatter{
-	ListIndent:   2,
+	ListIndent:   0,
 	MapIndent:    2,
 	StructIndent: 2,
 }
 
 func main() {
-	a := A{}
-	fmt.Println(f.ToString(a))
 	fmt.Println(f.ToString(map[string]any{"1": 1, "2": map[string]any{"3": "#"}}))
+	a := &A{Data: struct {
+		Age     int
+		Items   []string
+		private int
+	}{Items: []string{"a", "b", "c"}}}
+	fmt.Println(f.ToString(a))
 }

@@ -8,7 +8,7 @@ func appendIndent(sb *strings.Builder, indent int, layer int, isSeparate bool) {
 	if indent > 0 {
 		sb.WriteString("\n")
 		for i := 0; i < layer; i++ {
-			sb.WriteString("|") // TODO: 是否使用这招也改成可配置的
+			sb.WriteString("|")
 			sb.WriteString(strings.Repeat(" ", indent-1))
 		}
 	} else {

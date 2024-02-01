@@ -187,9 +187,17 @@ func (f *Formatter) funcOutTypeString(type_ reflect.Type) string {
 }
 
 func (f *Formatter) structToString(value reflect.Value, layer int) string {
-	var sb strings.Builder
 	type_ := value.Type()
-	length := value.NumField()
+	var fields []reflect.StructField
+	for i := 0; i < value.NumField(); i++ {
+		field := type_.Field(i)
+		if field.IsExported() {
+			fields = append(fields, field)
+		}
+	}
+	length := len(fields)
+
+	var sb strings.Builder
 
 	sb.WriteString("<")
 	sb.WriteString(f.typeToString(type_))
@@ -198,14 +206,11 @@ func (f *Formatter) structToString(value reflect.Value, layer int) string {
 			layer++
 		}
 		appendIndent(&sb, f.StructIndent, layer, true)
-		for i := 0; i < length; i++ {
-			field := type_.Field(i)
-			if field.IsExported() {
-				sb.WriteString(field.Name)
-				sb.WriteString("=")
-				sb.WriteString(f.toString(value.Field(i).Interface(), layer))
-			}
-			if i < length-1 { // TODO: 这里有问题，应该直接遍历IsExported的,否则就会多出一些空格或换行出来
+		for i, field := range fields {
+			sb.WriteString(field.Name)
+			sb.WriteString("=")
+			sb.WriteString(f.toString(value.Field(i).Interface(), layer))
+			if i < length-1 {
 				appendIndent(&sb, f.StructIndent, layer, true)
 			}
 		}
