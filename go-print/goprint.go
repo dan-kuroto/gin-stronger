@@ -7,8 +7,12 @@ import (
 )
 
 type Formatter struct {
-	// No line breaks when `Indent <= 0`.
-	Indent int
+	// indent for array&list
+	ListIndent int
+	// indent for map
+	MapIndent int
+	// indent for struct
+	StructIndent int
 	// Pointer preffix: such as '&' in `&time.Time{}` and '*' in `*time.Time`.
 	PointerPreffixHide bool
 	// Whether show container(map/array/slice) as a tag.
@@ -20,13 +24,13 @@ type Formatter struct {
 	// If `ContainerDisplayNum <= 0`, means infinity.
 	// If `len(data) > ContainerDisplayNum`, extra parts are shown as ellipsis.
 	ContainerDisplayNum int
-	// Only when `Indent > 0`, `StructMethodShow` is valid.
+	// Only when `StructIndent > 0`, `StructMethodShow` is valid.
 	StructMethodShow bool
 	Color            bool
 }
 
 var Default = Formatter{
-	Indent: 2,
+	StructIndent: 2,
 }
 
 func ToString(data any) string {
@@ -34,6 +38,10 @@ func ToString(data any) string {
 }
 
 func (f *Formatter) ToString(data any) string {
+	return f.toString(data, 0)
+}
+
+func (f *Formatter) toString(data any, layer int) string {
 	value := reflect.ValueOf(data)
 	switch value.Kind() {
 	case reflect.String:
@@ -45,40 +53,76 @@ func (f *Formatter) ToString(data any) string {
 		if !value.CanInterface() {
 			return fmt.Sprintf("%#v", data)
 		}
-		return "&" + ToString(value.Elem().Interface())
+		return "&" + f.toString(value.Elem().Interface(), layer)
 	case reflect.Array, reflect.Slice:
-		var sb strings.Builder
-		sb.WriteString("[")
-		for i := 0; i < value.Len(); i++ {
-			sb.WriteString(ToString(value.Index(i).Interface()))
-			if i < value.Len()-1 {
-				sb.WriteString(", ")
-			}
-		}
-		sb.WriteString("]")
-		return sb.String()
+		return f.listToString(value, layer)
 	case reflect.Map:
-		var sb strings.Builder
-		sb.WriteString("{")
-		for i, key := range value.MapKeys() {
-			sb.WriteString(ToString(key.Interface()))
-			sb.WriteString(": ")
-			sb.WriteString(ToString(value.MapIndex(key).Interface()))
-			if i < value.Len()-1 {
-				sb.WriteString(", ")
-			}
-		}
-		sb.WriteString("}")
-		return sb.String()
+		return f.mapToString(value, layer)
 	case reflect.Chan:
 		return fmt.Sprintf("<%s len=%d cap=%d ptr=%#x>", f.typeToString(value.Type()), value.Len(), value.Cap(), value.Pointer())
 	case reflect.Struct:
-		return f.structToString(value)
+		return f.structToString(value, layer)
 	case reflect.Func:
 		return f.funcToString(value)
 	default:
 		return fmt.Sprintf("%#v", data)
 	}
+}
+
+func (f *Formatter) listToString(value reflect.Value, layer int) string {
+	var sb strings.Builder
+	length := value.Len()
+
+	sb.WriteString("[")
+	if length > 0 {
+		if f.ListIndent > 0 {
+			layer++
+		}
+		appendIndent(&sb, f.ListIndent, layer, false)
+		for i := 0; i < length; i++ {
+			sb.WriteString(f.toString(value.Index(i).Interface(), layer))
+			if i < length-1 {
+				sb.WriteString(",")
+				appendIndent(&sb, f.ListIndent, layer, true)
+			}
+		}
+		if f.ListIndent > 0 {
+			layer--
+		}
+		appendIndent(&sb, f.ListIndent, layer, false)
+	}
+	sb.WriteString("]")
+
+	return sb.String()
+}
+
+func (f *Formatter) mapToString(value reflect.Value, layer int) string {
+	var sb strings.Builder
+	length := value.Len()
+
+	sb.WriteString("{")
+	if length > 0 {
+		if f.MapIndent > 0 {
+			layer++
+		}
+		appendIndent(&sb, f.MapIndent, layer, false)
+		for i, key := range value.MapKeys() {
+			sb.WriteString(f.toString(key.Interface(), layer))
+			sb.WriteString(": ")
+			sb.WriteString(f.toString(value.MapIndex(key).Interface(), layer))
+			if i < length-1 {
+				sb.WriteString(", ")
+				appendIndent(&sb, f.MapIndent, layer, true)
+			}
+		}
+		if f.MapIndent > 0 {
+			layer--
+		}
+		appendIndent(&sb, f.MapIndent, layer, false)
+	}
+	sb.WriteString("}")
+
+	return sb.String()
 }
 
 func (f *Formatter) typeToString(type_ reflect.Type) string {
@@ -142,20 +186,33 @@ func (f *Formatter) funcOutTypeString(type_ reflect.Type) string {
 	return sb.String()
 }
 
-func (f *Formatter) structToString(value reflect.Value) string {
-	type_ := value.Type()
-
+func (f *Formatter) structToString(value reflect.Value, layer int) string {
 	var sb strings.Builder
+	type_ := value.Type()
+	length := value.NumField()
+
 	sb.WriteString("<")
 	sb.WriteString(f.typeToString(type_))
-	for i := 0; i < value.NumField(); i++ {
-		field := type_.Field(i)
-		if field.IsExported() {
-			sb.WriteString(" ")
-			sb.WriteString(field.Name)
-			sb.WriteString("=")
-			sb.WriteString(ToString(value.Field(i).Interface()))
+	if length > 0 {
+		if f.StructIndent > 0 {
+			layer++
 		}
+		appendIndent(&sb, f.StructIndent, layer, true)
+		for i := 0; i < length; i++ {
+			field := type_.Field(i)
+			if field.IsExported() {
+				sb.WriteString(field.Name)
+				sb.WriteString("=")
+				sb.WriteString(f.toString(value.Field(i).Interface(), layer))
+			}
+			if i < length-1 { // TODO: 这里有问题，应该直接遍历IsExported的,否则就会多出一些空格或换行出来
+				appendIndent(&sb, f.StructIndent, layer, true)
+			}
+		}
+		if f.StructIndent > 0 {
+			layer--
+		}
+		appendIndent(&sb, f.StructIndent, layer, false)
 	}
 	sb.WriteString(">")
 

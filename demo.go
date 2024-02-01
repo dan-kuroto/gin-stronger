@@ -15,11 +15,13 @@ type A struct {
 	}
 }
 
+var f = gp.Formatter{
+	ListIndent:   2,
+	MapIndent:    2,
+	StructIndent: 2,
+}
+
 func main() {
-	var a func() A
-	b := func(s string, b func(int) map[string]A) (A, error) {
-		return A{}, nil
-	}
-	fmt.Println(gp.ToString(a))
-	fmt.Println(gp.ToString(b))
+	a := A{}
+	fmt.Println(f.ToString(a))
 }
