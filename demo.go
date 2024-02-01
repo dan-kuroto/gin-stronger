@@ -24,4 +24,5 @@ var f = gp.Formatter{
 func main() {
 	a := A{}
 	fmt.Println(f.ToString(a))
+	fmt.Println(f.ToString(map[string]any{"1": 1, "2": map[string]any{"3": "#"}}))
 }
