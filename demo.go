@@ -16,9 +16,11 @@ type A struct {
 }
 
 var f = gp.Formatter{
-	ListIndent:   0,
-	MapIndent:    2,
-	StructIndent: 2,
+	ListIndent:     0,
+	MapIndent:      2,
+	StructIndent:   2,
+	ListDisplayNum: 0,
+	MapDisplayNum:  0,
 }
 
 func main() {
