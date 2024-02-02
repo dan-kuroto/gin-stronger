@@ -18,3 +18,11 @@ func appendIndent(sb *strings.Builder, currIndent int, indents []int, isSeparate
 		}
 	}
 }
+
+func appendColoredString(sb *strings.Builder, str string, colorIdx int, useColor bool) {
+	if useColor {
+		colors[colorIdx%len(colors)].Fprint(sb, str)
+	} else {
+		sb.WriteString(str)
+	}
+}

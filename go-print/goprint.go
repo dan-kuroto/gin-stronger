@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+
+	"github.com/fatih/color"
 )
 
 type Formatter struct {
@@ -31,12 +33,22 @@ type Formatter struct {
 	// If `MapDisplayNum <= 0`, means infinity.
 	// If `len(data) > MapDisplayNum`, extra parts are shown as ellipsis.
 	MapDisplayNum int
-	// Only when `StructIndent > 0`, `StructMethodShow` is valid.
-	StructMethodShow bool
+	BracketColor  bool
 }
 
 var Default = Formatter{
-	StructIndent: 2, ListDisplayNum: 100, MapDisplayNum: 100,
+	StructIndent: 2, ListDisplayNum: 100, MapDisplayNum: 100, BracketColor: true,
+}
+
+var colors = []*color.Color{
+	color.New(color.FgBlack, color.Bold),
+	color.New(color.FgRed, color.Bold),
+	color.New(color.FgGreen, color.Bold),
+	color.New(color.FgYellow, color.Bold),
+	color.New(color.FgBlue, color.Bold),
+	color.New(color.FgMagenta, color.Bold),
+	color.New(color.FgCyan, color.Bold),
+	color.New(color.FgWhite, color.Bold),
 }
 
 func ToString(data any) string {
@@ -86,13 +98,14 @@ func (f *Formatter) listToString(value reflect.Value, indents []int, isArray boo
 	}
 
 	if f.ListShowAsTag {
+		appendColoredString(&sb, fmt.Sprint("<", f.typeToString(value.Type())), len(indents), f.BracketColor)
 		if isArray {
-			sb.WriteString(fmt.Sprintf("<%s items=", f.typeToString(value.Type())))
+			sb.WriteString(" items=")
 		} else {
-			sb.WriteString(fmt.Sprintf("<%s :len=%d :cap=%d items=", f.typeToString(value.Type()), value.Len(), value.Cap()))
+			sb.WriteString(fmt.Sprintf(" :len=%d :cap=%d items=", value.Len(), value.Cap()))
 		}
 	}
-	sb.WriteString("[")
+	appendColoredString(&sb, "[", len(indents), f.BracketColor)
 	if displayLength > 0 {
 		indents = append(indents, f.ListIndent)
 		appendIndent(&sb, f.ListIndent, indents, false)
@@ -110,9 +123,9 @@ func (f *Formatter) listToString(value reflect.Value, indents []int, isArray boo
 		indents = indents[:len(indents)-1]
 		appendIndent(&sb, f.ListIndent, indents, false)
 	}
-	sb.WriteString("]")
+	appendColoredString(&sb, "]", len(indents), f.BracketColor)
 	if f.ListShowAsTag {
-		sb.WriteString(">")
+		appendColoredString(&sb, ">", len(indents), f.BracketColor)
 	}
 
 	return sb.String()
@@ -127,13 +140,14 @@ func (f *Formatter) mapToString(value reflect.Value, indents []int) string {
 	}
 
 	if f.MapShowAsTag {
-		sb.WriteString(fmt.Sprintf("<%s :len=%d", f.typeToString(value.Type()), value.Len()))
+		appendColoredString(&sb, fmt.Sprint("<", f.typeToString(value.Type())), len(indents), f.BracketColor)
+		sb.WriteString(fmt.Sprintf(" :len=%d", value.Len()))
 	} else {
-		sb.WriteString("{")
+		appendColoredString(&sb, "{", len(indents), f.BracketColor)
 	}
 	if displayLength > 0 {
 		indents = append(indents, f.MapIndent)
-		appendIndent(&sb, f.MapIndent, indents, false)
+		appendIndent(&sb, f.MapIndent, indents, f.MapShowAsTag)
 		for i, key := range value.MapKeys() {
 			sb.WriteString(f.toString(key.Interface(), indents))
 			if f.MapShowAsTag {
@@ -162,9 +176,9 @@ func (f *Formatter) mapToString(value reflect.Value, indents []int) string {
 		appendIndent(&sb, f.MapIndent, indents, false)
 	}
 	if f.MapShowAsTag {
-		sb.WriteString(">")
+		appendColoredString(&sb, ">", len(indents), f.BracketColor)
 	} else {
-		sb.WriteString("}")
+		appendColoredString(&sb, "}", len(indents), f.BracketColor)
 	}
 
 	return sb.String()
@@ -246,7 +260,7 @@ func (f *Formatter) structToString(value reflect.Value, indents []int) string {
 
 	var sb strings.Builder
 
-	sb.WriteString("<")
+	appendColoredString(&sb, "<", len(indents), f.BracketColor)
 	sb.WriteString(f.typeToString(type_))
 	if length > 0 {
 		indents = append(indents, f.StructIndent)
@@ -262,7 +276,7 @@ func (f *Formatter) structToString(value reflect.Value, indents []int) string {
 		indents = indents[:len(indents)-1]
 		appendIndent(&sb, f.StructIndent, indents, false)
 	}
-	sb.WriteString(">")
+	appendColoredString(&sb, ">", len(indents), f.BracketColor)
 
 	return sb.String()
 }
