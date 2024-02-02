@@ -16,7 +16,11 @@ type A struct {
 }
 
 var f = gp.Formatter{
-	ListShowAsTag: true,
+	ListShowAsTag: false,
+	MapShowAsTag:  true,
+	ListIndent:    2,
+	MapIndent:     3,
+	StructIndent:  4,
 }
 
 func main() {
@@ -26,7 +30,7 @@ func main() {
 			"3": "4",
 			"5": []any{
 				6,
-				7,
+				A{},
 				[3]string{"8", "9"},
 				[]int{},
 			},

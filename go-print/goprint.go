@@ -44,10 +44,10 @@ func ToString(data any) string {
 }
 
 func (f *Formatter) ToString(data any) string {
-	return f.toString(data, 0)
+	return f.toString(data, []int{})
 }
 
-func (f *Formatter) toString(data any, layer int) string {
+func (f *Formatter) toString(data any, indents []int) string {
 	value := reflect.ValueOf(data)
 	switch value.Kind() {
 	case reflect.String:
@@ -59,17 +59,17 @@ func (f *Formatter) toString(data any, layer int) string {
 		if !value.CanInterface() {
 			return fmt.Sprintf("%#v", data)
 		}
-		return "&" + f.toString(value.Elem().Interface(), layer)
+		return "&" + f.toString(value.Elem().Interface(), indents)
 	case reflect.Array:
-		return f.listToString(value, layer, true)
+		return f.listToString(value, indents, true)
 	case reflect.Slice:
-		return f.listToString(value, layer, false)
+		return f.listToString(value, indents, false)
 	case reflect.Map:
-		return f.mapToString(value, layer)
+		return f.mapToString(value, indents)
 	case reflect.Chan:
 		return fmt.Sprintf("<%s len=%d cap=%d ptr=%#x>", f.typeToString(value.Type()), value.Len(), value.Cap(), value.Pointer())
 	case reflect.Struct:
-		return f.structToString(value, layer)
+		return f.structToString(value, indents)
 	case reflect.Func:
 		return f.funcToString(value)
 	default:
@@ -77,7 +77,7 @@ func (f *Formatter) toString(data any, layer int) string {
 	}
 }
 
-func (f *Formatter) listToString(value reflect.Value, layer int, isArray bool) string {
+func (f *Formatter) listToString(value reflect.Value, indents []int, isArray bool) string {
 	var sb strings.Builder
 	length := value.Len()
 	displayLength := length
@@ -94,25 +94,21 @@ func (f *Formatter) listToString(value reflect.Value, layer int, isArray bool) s
 	}
 	sb.WriteString("[")
 	if displayLength > 0 {
-		if f.ListIndent > 0 {
-			layer++
-		}
-		appendIndent(&sb, f.ListIndent, layer, false)
+		indents = append(indents, f.ListIndent)
+		appendIndent(&sb, f.ListIndent, indents, false)
 		for i := 0; i < displayLength; i++ {
-			sb.WriteString(f.toString(value.Index(i).Interface(), layer))
+			sb.WriteString(f.toString(value.Index(i).Interface(), indents))
 			if i < displayLength-1 { // before the last one
 				sb.WriteString(",")
-				appendIndent(&sb, f.ListIndent, layer, true)
+				appendIndent(&sb, f.ListIndent, indents, true)
 			} else if displayLength < length { // last one, but need ellipsis
 				sb.WriteString(",")
-				appendIndent(&sb, f.ListIndent, layer, true)
+				appendIndent(&sb, f.ListIndent, indents, true)
 				sb.WriteString("...")
 			}
 		}
-		if f.ListIndent > 0 {
-			layer--
-		}
-		appendIndent(&sb, f.ListIndent, layer, false)
+		indents = indents[:len(indents)-1]
+		appendIndent(&sb, f.ListIndent, indents, false)
 	}
 	sb.WriteString("]")
 	if f.ListShowAsTag {
@@ -122,7 +118,7 @@ func (f *Formatter) listToString(value reflect.Value, layer int, isArray bool) s
 	return sb.String()
 }
 
-func (f *Formatter) mapToString(value reflect.Value, layer int) string {
+func (f *Formatter) mapToString(value reflect.Value, indents []int) string {
 	var sb strings.Builder
 	length := value.Len()
 	displayLength := length
@@ -136,38 +132,34 @@ func (f *Formatter) mapToString(value reflect.Value, layer int) string {
 		sb.WriteString("{")
 	}
 	if displayLength > 0 {
-		if f.MapIndent > 0 {
-			layer++
-		}
-		appendIndent(&sb, f.MapIndent, layer, false)
+		indents = append(indents, f.MapIndent)
+		appendIndent(&sb, f.MapIndent, indents, false)
 		for i, key := range value.MapKeys() {
-			sb.WriteString(f.toString(key.Interface(), layer))
+			sb.WriteString(f.toString(key.Interface(), indents))
 			if f.MapShowAsTag {
 				sb.WriteString("=")
 			} else {
 				sb.WriteString(": ")
 			}
-			sb.WriteString(f.toString(value.MapIndex(key).Interface(), layer))
+			sb.WriteString(f.toString(value.MapIndex(key).Interface(), indents))
 			if i < displayLength-1 { // before the last one
 				if !f.MapShowAsTag {
 					sb.WriteString(",")
 				}
-				appendIndent(&sb, f.MapIndent, layer, true)
+				appendIndent(&sb, f.MapIndent, indents, true)
 			} else { // last one
 				if displayLength < length { // need ellipsis
 					if !f.MapShowAsTag {
 						sb.WriteString(",")
 					}
-					appendIndent(&sb, f.MapIndent, layer, true)
+					appendIndent(&sb, f.MapIndent, indents, true)
 					sb.WriteString("...")
 				}
 				break
 			}
 		}
-		if f.MapIndent > 0 {
-			layer--
-		}
-		appendIndent(&sb, f.MapIndent, layer, false)
+		indents = indents[:len(indents)-1]
+		appendIndent(&sb, f.MapIndent, indents, false)
 	}
 	if f.MapShowAsTag {
 		sb.WriteString(">")
@@ -241,7 +233,7 @@ func (f *Formatter) funcOutTypeString(type_ reflect.Type) string {
 	return sb.String()
 }
 
-func (f *Formatter) structToString(value reflect.Value, layer int) string {
+func (f *Formatter) structToString(value reflect.Value, indents []int) string {
 	type_ := value.Type()
 	var fields []reflect.StructField
 	for i := 0; i < value.NumField(); i++ {
@@ -257,22 +249,18 @@ func (f *Formatter) structToString(value reflect.Value, layer int) string {
 	sb.WriteString("<")
 	sb.WriteString(f.typeToString(type_))
 	if length > 0 {
-		if f.StructIndent > 0 {
-			layer++
-		}
-		appendIndent(&sb, f.StructIndent, layer, true)
+		indents = append(indents, f.StructIndent)
+		appendIndent(&sb, f.StructIndent, indents, true)
 		for i, field := range fields {
 			sb.WriteString(field.Name)
 			sb.WriteString("=")
-			sb.WriteString(f.toString(value.Field(i).Interface(), layer))
+			sb.WriteString(f.toString(value.Field(i).Interface(), indents))
 			if i < length-1 {
-				appendIndent(&sb, f.StructIndent, layer, true)
+				appendIndent(&sb, f.StructIndent, indents, true)
 			}
 		}
-		if f.StructIndent > 0 {
-			layer--
-		}
-		appendIndent(&sb, f.StructIndent, layer, false)
+		indents = indents[:len(indents)-1]
+		appendIndent(&sb, f.StructIndent, indents, false)
 	}
 	sb.WriteString(">")
 
