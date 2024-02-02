@@ -89,7 +89,7 @@ func (f *Formatter) listToString(value reflect.Value, indents []int, isArray boo
 		if isArray {
 			sb.WriteString(fmt.Sprintf("<%s items=", f.typeToString(value.Type())))
 		} else {
-			sb.WriteString(fmt.Sprintf("<%s :len=%d items=", f.typeToString(value.Type()), value.Len()))
+			sb.WriteString(fmt.Sprintf("<%s :len=%d :cap=%d items=", f.typeToString(value.Type()), value.Len(), value.Cap()))
 		}
 	}
 	sb.WriteString("[")

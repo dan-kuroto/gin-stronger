@@ -16,24 +16,18 @@ type A struct {
 }
 
 var f = gp.Formatter{
-	ListShowAsTag: false,
-	MapShowAsTag:  true,
-	ListIndent:    2,
-	MapIndent:     3,
-	StructIndent:  4,
+	ListShowAsTag:  true,
+	MapShowAsTag:   true,
+	ListIndent:     0,
+	MapIndent:      3,
+	StructIndent:   4,
+	ListDisplayNum: 10,
 }
 
 func main() {
-	fmt.Println(f.ToString(map[string]any{
-		"1": 1,
-		"2": map[string]any{
-			"3": "4",
-			"5": []any{
-				6,
-				A{},
-				[3]string{"8", "9"},
-				[]int{},
-			},
-		},
-	}))
+	a := make([]int, 0, 4)
+	for i := 0; i < 10; i++ {
+		a = append(a, i)
+		fmt.Println(f.ToString(a))
+	}
 }
