@@ -60,8 +60,10 @@ func (f *Formatter) toString(data any, layer int) string {
 			return fmt.Sprintf("%#v", data)
 		}
 		return "&" + f.toString(value.Elem().Interface(), layer)
-	case reflect.Array, reflect.Slice:
-		return f.listToString(value, layer)
+	case reflect.Array:
+		return f.listToString(value, layer, true)
+	case reflect.Slice:
+		return f.listToString(value, layer, false)
 	case reflect.Map:
 		return f.mapToString(value, layer)
 	case reflect.Chan:
@@ -75,7 +77,7 @@ func (f *Formatter) toString(data any, layer int) string {
 	}
 }
 
-func (f *Formatter) listToString(value reflect.Value, layer int) string {
+func (f *Formatter) listToString(value reflect.Value, layer int, isArray bool) string {
 	var sb strings.Builder
 	length := value.Len()
 	displayLength := length
@@ -84,7 +86,11 @@ func (f *Formatter) listToString(value reflect.Value, layer int) string {
 	}
 
 	if f.ListShowAsTag {
-		sb.WriteString(fmt.Sprintf("<%s :len=%d items=", f.typeToString(value.Type()), value.Len()))
+		if isArray {
+			sb.WriteString(fmt.Sprintf("<%s items=", f.typeToString(value.Type())))
+		} else {
+			sb.WriteString(fmt.Sprintf("<%s :len=%d items=", f.typeToString(value.Type()), value.Len()))
+		}
 	}
 	sb.WriteString("[")
 	if displayLength > 0 {
@@ -176,7 +182,9 @@ func (f *Formatter) typeToString(type_ reflect.Type) string {
 	switch type_.Kind() {
 	case reflect.Pointer:
 		return "*" + f.typeToString(type_.Elem())
-	case reflect.Array, reflect.Slice:
+	case reflect.Array:
+		return fmt.Sprintf("[%d]%s", type_.Len(), f.typeToString(type_.Elem()))
+	case reflect.Slice:
 		return fmt.Sprintf("[]%s", f.typeToString(type_.Elem()))
 	case reflect.Map:
 		return fmt.Sprintf("map[%s, %s]", f.typeToString(type_.Key()), f.typeToString(type_.Elem()))
