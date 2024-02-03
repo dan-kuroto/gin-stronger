@@ -1,7 +1,6 @@
 package gs
 
 import (
-	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -14,7 +13,6 @@ type IConfiguration interface {
 	GetActiveEnv() string
 	GetGinRelease() bool
 	GetGinAddr() string
-	ParseCmdParams()
 	SolveDefaultValue()
 	GetSnowFlakeConfig() SnowFlakeConfig
 }
@@ -69,8 +67,6 @@ func initConfig[T IConfiguration](config T) {
 			panic(err)
 		}
 	}
-	// override by cmd parameters
-	config.ParseCmdParams()
 	// set default values
 	config.SolveDefaultValue()
 
@@ -80,22 +76,6 @@ func initConfig[T IConfiguration](config T) {
 
 func (config *Configuration) GetActiveEnv() string {
 	return config.Env.Active
-}
-
-func (config *Configuration) ParseCmdParams() {
-	release := flag.Bool("release", false, "use release mode")
-	host := flag.String("host", "", "gin host")
-	port := flag.Int("port", 0, "gin port")
-	flag.Parse()
-	if *release {
-		config.Gin.Release = true
-	}
-	if *host != "" {
-		config.Gin.Host = *host
-	}
-	if *port != 0 {
-		config.Gin.Port = *port
-	}
 }
 
 func (config *Configuration) GetGinRelease() bool {
