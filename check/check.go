@@ -47,7 +47,7 @@ func SimpleCheck(checker *Checker, condition bool, err error) {
 
 func NotNil[T any](data Data[*T]) error {
 	if data.Value == nil {
-		return fmt.Errorf("`%s` is required!", data.Name)
+		return fmt.Errorf("%s is required!", data.Name)
 	} else {
 		return nil
 	}
@@ -55,7 +55,7 @@ func NotNil[T any](data Data[*T]) error {
 
 func NotEmptyStr(data Data[string]) error {
 	if len(data.Value) == 0 {
-		return fmt.Errorf("`%s` must not be empty!", data.Name)
+		return fmt.Errorf("%s must not be empty!", data.Name)
 	} else {
 		return nil
 	}
@@ -63,7 +63,7 @@ func NotEmptyStr(data Data[string]) error {
 
 func NotEmptyList[T any](data Data[[]T]) error {
 	if len(data.Value) == 0 {
-		return fmt.Errorf("`%s` must not be empty!", data.Name)
+		return fmt.Errorf("%s must not be empty!", data.Name)
 	} else {
 		return nil
 	}
@@ -71,7 +71,7 @@ func NotEmptyList[T any](data Data[[]T]) error {
 
 func NotEmptyMap[K comparable, V any](data Data[map[K]V]) error {
 	if len(data.Value) == 0 {
-		return fmt.Errorf("`%s` must not be empty!", data.Name)
+		return fmt.Errorf("%s must not be empty!", data.Name)
 	} else {
 		return nil
 	}
@@ -79,7 +79,7 @@ func NotEmptyMap[K comparable, V any](data Data[map[K]V]) error {
 
 func NotBlank(data Data[string]) error {
 	if strings.TrimSpace(data.Value) == "" {
-		return fmt.Errorf("`%s` must not be blank!", data.Name)
+		return fmt.Errorf("%s must not be blank!", data.Name)
 	} else {
 		return nil
 	}
@@ -89,7 +89,7 @@ func NotBlank(data Data[string]) error {
 func IsNumeric(data Data[string]) error {
 	for _, ch := range data.Value {
 		if ch < '0' || ch > '9' {
-			return fmt.Errorf("`%s` must be numeric!", data.Name)
+			return fmt.Errorf("%s must be numeric!", data.Name)
 		}
 	}
 	return nil
@@ -98,7 +98,7 @@ func IsNumeric(data Data[string]) error {
 // check whether value is a valid email
 func IsEmail(data Data[string]) error {
 	if _, err := mail.ParseAddress(data.Value); err != nil {
-		return fmt.Errorf("`%s` is not a valid email!", data.Name)
+		return fmt.Errorf("%s is not a valid email!", data.Name)
 	}
 	return nil
 }
@@ -106,7 +106,7 @@ func IsEmail(data Data[string]) error {
 // check whether value is a valid URL
 func IsURL(data Data[string]) error {
 	if _, err := url.ParseRequestURI(data.Value); err != nil {
-		return fmt.Errorf("`%s` is not a valid URL!", data.Name)
+		return fmt.Errorf("%s is not a valid URL!", data.Name)
 	}
 	return nil
 }
@@ -117,7 +117,7 @@ func IsURL(data Data[string]) error {
 func Range[T number](min, max T) CheckFunc[T] {
 	return func(data Data[T]) error {
 		if data.Value < min || data.Value > max {
-			return fmt.Errorf("`%s` must be in range of [%v, %v]!", data.Name, min, max)
+			return fmt.Errorf("%s must be in range of [%v, %v]!", data.Name, min, max)
 		} else {
 			return nil
 		}
@@ -131,7 +131,7 @@ func Range[T number](min, max T) CheckFunc[T] {
 func Size[T any](min, max int) CheckFunc[[]T] {
 	return func(data Data[[]T]) error {
 		if len(data.Value) < min || len(data.Value) > max {
-			return fmt.Errorf("`%s` must be in size of [%v, %v]!", data.Name, min, max)
+			return fmt.Errorf("%s must be in size of [%v, %v]!", data.Name, min, max)
 		} else {
 			return nil
 		}
@@ -144,7 +144,7 @@ func Size[T any](min, max int) CheckFunc[[]T] {
 func Length(min, max int) CheckFunc[string] {
 	return func(data Data[string]) error {
 		if utf8.RuneCountInString(data.Value) < min || utf8.RuneCountInString(data.Value) > max {
-			return fmt.Errorf("`%s` must be in length of [%v, %v]!", data.Name, min, max)
+			return fmt.Errorf("%s must be in length of [%v, %v]!", data.Name, min, max)
 		} else {
 			return nil
 		}
@@ -157,7 +157,7 @@ func Length(min, max int) CheckFunc[string] {
 func Eq[T comparable](expect T) CheckFunc[T] {
 	return func(data Data[T]) error {
 		if data.Value != expect {
-			return fmt.Errorf("`%s` must be equal to %s!", data.Name, formatter.ToString(expect))
+			return fmt.Errorf("%s must be equal to %s!", data.Name, formatter.ToString(expect))
 		} else {
 			return nil
 		}
@@ -170,7 +170,7 @@ func Eq[T comparable](expect T) CheckFunc[T] {
 func Neq[T comparable](expect T) CheckFunc[T] {
 	return func(data Data[T]) error {
 		if data.Value == expect {
-			return fmt.Errorf("`%s` must not be equal to %s!", data.Name, formatter.ToString(expect))
+			return fmt.Errorf("%s must not be equal to %s!", data.Name, formatter.ToString(expect))
 		} else {
 			return nil
 		}
@@ -183,7 +183,7 @@ func Neq[T comparable](expect T) CheckFunc[T] {
 func Gt[T orderable](expect T) CheckFunc[T] {
 	return func(data Data[T]) error {
 		if data.Value <= expect {
-			return fmt.Errorf("`%s` must be greater than %s!", data.Name, formatter.ToString(expect))
+			return fmt.Errorf("%s must be greater than %s!", data.Name, formatter.ToString(expect))
 		} else {
 			return nil
 		}
@@ -196,7 +196,7 @@ func Gt[T orderable](expect T) CheckFunc[T] {
 func Ge[T orderable](expect T) CheckFunc[T] {
 	return func(data Data[T]) error {
 		if data.Value < expect {
-			return fmt.Errorf("`%s` must be greater than or equal to %s!", data.Name, formatter.ToString(expect))
+			return fmt.Errorf("%s must be greater than or equal to %s!", data.Name, formatter.ToString(expect))
 		} else {
 			return nil
 		}
@@ -209,7 +209,7 @@ func Ge[T orderable](expect T) CheckFunc[T] {
 func Lt[T orderable](expect T) CheckFunc[T] {
 	return func(data Data[T]) error {
 		if data.Value >= expect {
-			return fmt.Errorf("`%s` must be less than %s!", data.Name, formatter.ToString(expect))
+			return fmt.Errorf("%s must be less than %s!", data.Name, formatter.ToString(expect))
 		} else {
 			return nil
 		}
@@ -222,7 +222,7 @@ func Lt[T orderable](expect T) CheckFunc[T] {
 func Le[T orderable](expect T) CheckFunc[T] {
 	return func(data Data[T]) error {
 		if data.Value > expect {
-			return fmt.Errorf("`%s` must be less than or equal to %s!", data.Name, formatter.ToString(expect))
+			return fmt.Errorf("%s must be less than or equal to %s!", data.Name, formatter.ToString(expect))
 		} else {
 			return nil
 		}
@@ -237,7 +237,7 @@ func In[T comparable](expect ...T) CheckFunc[T] {
 				return nil
 			}
 		}
-		return fmt.Errorf("`%s` must be in %s!", data.Name, formatter.ToString(expect))
+		return fmt.Errorf("%s must be in %s!", data.Name, formatter.ToString(expect))
 	}
 }
 
@@ -246,7 +246,7 @@ func NotIn[T comparable](expect ...T) CheckFunc[T] {
 	return func(data Data[T]) error {
 		for _, v := range expect {
 			if data.Value == v {
-				return fmt.Errorf("`%s` must not be in %s!", data.Name, formatter.ToString(expect))
+				return fmt.Errorf("%s must not be in %s!", data.Name, formatter.ToString(expect))
 			}
 		}
 		return nil
@@ -261,7 +261,7 @@ func Match(expect string) CheckFunc[string] {
 			return err
 		}
 		if !matched {
-			return fmt.Errorf("`%s` must match /%s/!", data.Name, expect)
+			return fmt.Errorf("%s must match /%s/!", data.Name, expect)
 		}
 		return nil
 	}
