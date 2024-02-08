@@ -3,6 +3,7 @@ package gs
 import (
 	"net/http"
 
+	"github.com/dan-kuroto/gin-stronger/config"
 	"github.com/gin-gonic/gin"
 )
 
@@ -10,16 +11,16 @@ type HttpMethod uint16
 type StaticMapFunc func() map[string]string
 
 const (
-	GET     HttpMethod = 0b000000001
-	HEAD    HttpMethod = 0b000000010
-	POST    HttpMethod = 0b000000100
-	PUT     HttpMethod = 0b000001000
-	PATCH   HttpMethod = 0b000010000
-	DELETE  HttpMethod = 0b000100000
-	CONNECT HttpMethod = 0b001000000
-	OPTIONS HttpMethod = 0b010000000
-	TRACE   HttpMethod = 0b100000000
-	Any     HttpMethod = 0b111111111
+	GET HttpMethod = 1 << iota
+	HEAD
+	POST
+	PUT
+	PATCH
+	DELETE
+	CONNECT
+	OPTIONS
+	TRACE
+	Any = GET | HEAD | POST | PUT | PATCH | DELETE | CONNECT | OPTIONS | TRACE
 )
 
 var rootRouter = Router{Path: ""}
@@ -133,7 +134,7 @@ func SetStatic(getter StaticMapFunc) {
 	staticMapFunc = getter
 }
 
-func RunApp[T IConfiguration](config T) {
+func RunApp[T config.IConfiguration](config T) {
 	printBanner()
 	initConfig(config)
 
@@ -151,5 +152,5 @@ func RunApp[T IConfiguration](config T) {
 
 // It is shorthand for gs.RunApp(&gs.Configuration{})
 func RunAppDefault() {
-	RunApp(&Configuration{})
+	RunApp(&config.Configuration{})
 }

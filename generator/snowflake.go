@@ -1,19 +1,13 @@
-package gs
+package generator
 
 import (
 	"fmt"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/dan-kuroto/gin-stronger/config"
 )
-
-type IdType interface {
-	int | int8 | int16 | int32 | int64 | uint | uint8 | uint16 | uint32 | uint64 | string
-}
-
-type IdGenerator[T IdType] interface {
-	NextId() T
-}
 
 const (
 	SNOW_FLAKE_SEQUENCE_BIT       int64 = 12
@@ -27,22 +21,28 @@ const (
 	SNOW_FLAKE_TIMESTMP_LEFT      int64 = SNOW_FLAKE_DATACENTER_LEFT + SNOW_FLAKE_DATACENTER_BIT
 )
 
-type snowFlake struct {
+type SnowFlakeGenerator struct {
 	// init: 0
 	sequence int64
 	// init: -1
 	lastStmp int64
 
-	mutex sync.Mutex
+	mutex  sync.Mutex
+	config config.IConfiguration
 }
 
-var SnowFlake snowFlake
+func NewSnowFlake(config config.IConfiguration) *SnowFlakeGenerator {
+	return &SnowFlakeGenerator{
+		lastStmp: -1,
+		config:   config,
+	}
+}
 
-func (s *snowFlake) NextId() int64 {
+func (s *SnowFlakeGenerator) NextId() int64 {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	snowflake := Config.GetSnowFlakeConfig()
+	snowflake := s.config.GetSnowFlakeConfig()
 
 	currStmp := getNewStmp()
 	if currStmp < s.lastStmp {
@@ -64,11 +64,11 @@ func (s *snowFlake) NextId() int64 {
 		s.sequence
 }
 
-func (s *snowFlake) NextStrId() string {
+func (s *SnowFlakeGenerator) NextStrId() string {
 	return fmt.Sprint(s.NextId())
 }
 
-func (s *snowFlake) getNextMilli() int64 {
+func (s *SnowFlakeGenerator) getNextMilli() int64 {
 	mill := getNewStmp()
 	for mill <= s.lastStmp {
 		mill = getNewStmp()
