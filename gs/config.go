@@ -40,6 +40,11 @@ type Configuration struct {
 		Database  string `yaml:"database"`
 		DebugMode bool   `yaml:"debug-mode"`
 	} `yaml:"mysql"`
+	Redis struct {
+		Host     string `yaml:"host"`
+		Port     int    `yaml:"port"`
+		Password string `yaml:"password"`
+	} `yaml:"redis"`
 	SnowFlake SnowFlakeConfig `yaml:"snow-flake"`
 }
 
