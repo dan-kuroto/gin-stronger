@@ -1,8 +1,7 @@
 package generator
 
 import (
-	"fmt"
-	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -44,10 +43,9 @@ func (s *SnowFlakeGenerator) NextId() int64 {
 
 	snowflake := s.config.GetSnowFlakeConfig()
 
-	currStmp := getNewStmp()
+	currStmp := s.getCurrStmp()
 	if currStmp < s.lastStmp {
-		fmt.Println("Clock moved backwards. Refusing to generate id")
-		os.Exit(1)
+		panic("Clock moved backwards. Refusing to generate id!")
 	} else if currStmp == s.lastStmp {
 		s.sequence = (s.sequence + 1) & SNOW_FLAKE_MAX_SEQUENCE
 		if s.sequence == 0 {
@@ -65,17 +63,21 @@ func (s *SnowFlakeGenerator) NextId() int64 {
 }
 
 func (s *SnowFlakeGenerator) NextStrId() string {
-	return fmt.Sprint(s.NextId())
+	return strconv.FormatInt(s.NextId(), 10)
+}
+
+func (s *SnowFlakeGenerator) NextShortId() string {
+	return strconv.FormatInt(s.NextId(), 36)
 }
 
 func (s *SnowFlakeGenerator) getNextMilli() int64 {
-	mill := getNewStmp()
+	mill := s.getCurrStmp()
 	for mill <= s.lastStmp {
-		mill = getNewStmp()
+		mill = s.getCurrStmp()
 	}
 	return mill
 }
 
-func getNewStmp() int64 {
+func (s *SnowFlakeGenerator) getCurrStmp() int64 {
 	return time.Now().UnixMilli()
 }

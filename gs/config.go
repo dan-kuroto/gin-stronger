@@ -14,7 +14,7 @@ var Config config.IConfiguration
 
 // Load config from application.yml, application-{env}.yml and cmd parameters.
 // (`env` is given by application.yml)
-func initConfig[T config.IConfiguration](config T) {
+func InitConfig[T config.IConfiguration](config T) {
 	// init by application.yml
 	data, err := os.ReadFile("application.yml")
 	if err != nil {

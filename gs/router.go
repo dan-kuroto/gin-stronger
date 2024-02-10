@@ -92,7 +92,7 @@ func handleRouter(router ginEngineOrGroup, gsRouter *Router) {
 	}
 }
 
-func addRouter(router ginEngineOrGroup, gsRouter *Router) {
+func AddRouter(router ginEngineOrGroup, gsRouter *Router) {
 	if len(gsRouter.Children) == 0 {
 		handleRouter(router, gsRouter)
 	} else {
@@ -101,12 +101,12 @@ func addRouter(router ginEngineOrGroup, gsRouter *Router) {
 			group.Use(gsRouter.MiddleWares...)
 		}
 		for _, subRouter := range gsRouter.Children {
-			addRouter(group, &subRouter)
+			AddRouter(group, &subRouter)
 		}
 	}
 }
 
-func initStatic(engine *gin.Engine) {
+func InitStatic(engine *gin.Engine) {
 	for urlPath, filePath := range staticMapFunc() {
 		engine.Static(urlPath, filePath)
 	}
@@ -135,8 +135,9 @@ func SetStatic(getter StaticMapFunc) {
 }
 
 func RunApp[T config.IConfiguration](config T) {
-	printBanner()
-	initConfig(config)
+	PrintBanner()
+	InitConfig(config)
+	InitIdGenerators()
 
 	if Config.GetGinRelease() {
 		gin.SetMode(gin.ReleaseMode)
@@ -144,8 +145,8 @@ func RunApp[T config.IConfiguration](config T) {
 
 	engine := gin.Default()
 
-	addRouter(engine, &rootRouter)
-	initStatic(engine)
+	AddRouter(engine, &rootRouter)
+	InitStatic(engine)
 
 	engine.Run(Config.GetGinAddr())
 }
