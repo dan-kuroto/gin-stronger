@@ -1,6 +1,7 @@
 package gs
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/dan-kuroto/gin-stronger/config"
@@ -107,6 +108,9 @@ func AddRouter(router ginEngineOrGroup, gsRouter *Router) {
 }
 
 func InitStatic(engine *gin.Engine) {
+	if staticMapFunc == nil {
+		return
+	}
 	for urlPath, filePath := range staticMapFunc() {
 		engine.Static(urlPath, filePath)
 	}
@@ -136,7 +140,9 @@ func SetStatic(getter StaticMapFunc) {
 
 func RunApp[T config.IConfiguration](config T) {
 	PrintBanner()
-	InitConfig(config)
+	if err := InitConfig(config); err != nil {
+		log.Println("init config failed:", err.Error())
+	}
 	InitIdGenerators()
 
 	if Config.GetGinRelease() {
