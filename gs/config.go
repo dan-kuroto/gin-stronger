@@ -13,6 +13,8 @@ var Config config.IConfiguration
 // (`env` is given by application.yml)
 func InitConfig[T config.IConfiguration](config T) error {
 	Config = config
+	// set default values
+	defer config.SolveDefaultValue()
 
 	const baseName = "application"
 	// init by application.yml
@@ -25,9 +27,6 @@ func InitConfig[T config.IConfiguration](config T) error {
 			return err
 		}
 	}
-	// set default values
-	config.SolveDefaultValue()
-
 	log.Println("config load complete")
 	return nil
 }
