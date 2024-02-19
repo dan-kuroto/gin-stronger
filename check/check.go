@@ -3,18 +3,14 @@ package check
 import (
 	"errors"
 	"fmt"
-	"net/mail"
-	"net/url"
-	"regexp"
 	"strings"
-	"unicode/utf8"
 )
 
 type Checker struct {
 	SolveError func(err error)
 }
 
-func (checker *Checker) Context(name string, data any) *Context {
+func (checker *Checker) Check(name string, data any) *Context {
 	return &Context{
 		name:       name,
 		value:      data,
@@ -31,38 +27,67 @@ func (checker *Checker) Assert(condition bool, errMsg string) {
 type Context struct {
 	name       string
 	value      any
+	err        error
 	solveError func(err error)
 }
 
+func (ctx *Context) Error() error {
+	return ctx.err
+}
+
 func (ctx *Context) Assert(condition bool, errMsg string) *Context {
-	if !condition {
-		ctx.solveError(errors.New(errMsg))
+	if ctx.err != nil {
+		return ctx
 	}
+
+	if !condition {
+		ctx.err = errors.New(errMsg)
+		ctx.solveError(ctx.err)
+	}
+
 	return ctx
 }
 
 func (ctx *Context) NotNil() *Context {
-	if ctx.value == nil {
-		ctx.solveError(fmt.Errorf("%s is required!", ctx.name))
+	if ctx.err != nil {
+		return ctx
 	}
+
+	if ctx.value == nil {
+		ctx.err = fmt.Errorf("%s is required!", ctx.name)
+		ctx.solveError(ctx.err)
+	}
+
 	return ctx
 }
 
 func (ctx *Context) NotEmpty() *Context {
-	if length, ok := getLength(ctx.value); ok && length == 0 {
-		ctx.solveError(fmt.Errorf("%s must not be empty!", ctx.name))
+	if ctx.err != nil {
+		return ctx
 	}
+
+	if length, ok := getLength(ctx.value); ok && length == 0 {
+		ctx.err = fmt.Errorf("%s must not be empty!", ctx.name)
+		ctx.solveError(ctx.err)
+	}
+
 	return ctx
 }
 
 func (ctx *Context) NotBlank() *Context {
-	value, ok := ctx.value.(string)
-	if ok && strings.TrimSpace(value) == "" {
-		ctx.solveError(fmt.Errorf("%s must not be blank!", ctx.name))
+	if ctx.err != nil {
+		return ctx
 	}
+
+	if value, ok := ctx.value.(string); ok && strings.TrimSpace(value) == "" {
+		ctx.err = fmt.Errorf("%s must not be blank!", ctx.name)
+		ctx.solveError(ctx.err)
+	}
+
 	return ctx
 }
 
+/*
 // check whether value consists of 0-9
 func IsNumeric(data Context[string]) error {
 	for _, ch := range data.Value {
@@ -244,3 +269,4 @@ func Match(expect string) CheckFunc[string] {
 		return nil
 	}
 }
+*/

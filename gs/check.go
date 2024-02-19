@@ -4,14 +4,16 @@ import (
 	"github.com/dan-kuroto/gin-stronger/check"
 )
 
-type Checker check.Checker
-
-var defaultChecker = Checker{
+var defaultChecker = &check.Checker{
 	SolveError: func(err error) {
 		panic(err.Error())
 	},
 }
 
-func SetDefaultChecker(checker *Checker) {
-	defaultChecker = *checker
+func SetDefaultChecker(checker *check.Checker) {
+	defaultChecker = checker
+}
+
+func Check(name string, data any) *check.Context {
+	return defaultChecker.Check(name, data)
 }
