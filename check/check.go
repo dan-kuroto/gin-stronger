@@ -3,6 +3,8 @@ package check
 import (
 	"errors"
 	"fmt"
+	"net/mail"
+	"net/url"
 	"strings"
 )
 
@@ -87,46 +89,75 @@ func (ctx *Context) NotBlank() *Context {
 	return ctx
 }
 
-/*
 // check whether value consists of 0-9
-func IsNumeric(data Context[string]) error {
-	for _, ch := range data.Value {
-		if ch < '0' || ch > '9' {
-			return fmt.Errorf("%s must be numeric!", data.Name)
+func (ctx *Context) IsNumeric() *Context {
+	if ctx.err != nil {
+		return ctx
+	}
+
+	if value, ok := ctx.value.(string); ok {
+		for _, ch := range value {
+			if ch < '0' || ch > '9' {
+				ctx.err = fmt.Errorf("%s must be numeric!", ctx.name)
+				ctx.solveError(ctx.err)
+				break
+			}
 		}
 	}
-	return nil
+
+	return ctx
 }
 
 // check whether value is a valid email
-func IsEmail(data Context[string]) error {
-	if _, err := mail.ParseAddress(data.Value); err != nil {
-		return fmt.Errorf("%s is not a valid email!", data.Name)
+func (ctx *Context) IsEmail() *Context {
+	if ctx.err != nil {
+		return ctx
 	}
-	return nil
+
+	if value, ok := ctx.value.(string); ok {
+		if _, err := mail.ParseAddress(value); err != nil {
+			ctx.err = fmt.Errorf("%s is not a valid email!", ctx.name)
+			ctx.solveError(ctx.err)
+		}
+	}
+
+	return ctx
 }
 
 // check whether value is a valid URL
-func IsURL(data Context[string]) error {
-	if _, err := url.ParseRequestURI(data.Value); err != nil {
-		return fmt.Errorf("%s is not a valid URL!", data.Name)
+func (ctx *Context) IsURL() *Context {
+	if ctx.err != nil {
+		return ctx
 	}
-	return nil
-}
 
-// generate a CheckFunc to check whether value in range of [min, max]
-//
-// (min <= value <= max)
-func Range[T number](min, max T) CheckFunc[T] {
-	return func(data Context[T]) error {
-		if data.Value < min || data.Value > max {
-			return fmt.Errorf("%s must be in range of [%v, %v]!", data.Name, min, max)
-		} else {
-			return nil
+	if value, ok := ctx.value.(string); ok {
+		if _, err := url.ParseRequestURI(value); err != nil {
+			ctx.err = fmt.Errorf("%s is not a valid URL!", ctx.name)
+			ctx.solveError(ctx.err)
 		}
 	}
+
+	return ctx
 }
 
+// check whether min <= value <= max (min&max must be a number)
+func (ctx *Context) Range(min, max float64) *Context {
+	if ctx.err != nil {
+		return ctx
+	}
+
+	// TODO: value为int系列时转不了float64，还是另外写一个toFloat64函数吧……反正number类型可以枚举
+	if value, ok := ctx.value.(float64); ok {
+		if value < min || value > max {
+			ctx.err = fmt.Errorf("%s must be in range of [%v, %v]!", ctx.name, min, max)
+			ctx.solveError(ctx.err)
+		}
+	}
+
+	return ctx
+}
+
+/*
 // generate a CheckFunc to check whether the size of value(slice, array, or map)
 // in range of [min, max]
 //
