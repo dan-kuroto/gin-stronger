@@ -140,7 +140,7 @@ func (ctx *Context) IsURL() *Context {
 	return ctx
 }
 
-// check whether min <= value <= max
+// check whether min <= value <= max (value can be int/int8/.../uint/uint8/.../float32/float64)
 func (ctx *Context) Range(min, max float64) *Context {
 	if ctx.err != nil {
 		return ctx
@@ -156,21 +156,26 @@ func (ctx *Context) Range(min, max float64) *Context {
 	return ctx
 }
 
-/*
-// generate a CheckFunc to check whether the size of value(slice, array, or map)
-// in range of [min, max]
+// check whether min <= len(value) <= max (value can be string, slice, array, or map)
 //
-// (min <= len(value) <= max)
-func Size[T any](min, max int) CheckFunc[[]T] {
-	return func(data Context[[]T]) error {
-		if len(data.Value) < min || len(data.Value) > max {
-			return fmt.Errorf("%s must be in size of [%v, %v]!", data.Name, min, max)
-		} else {
-			return nil
+// For string, what is checked is the number of bytes.
+// If you want to check the number of characters(rune), use `Length`.
+func (ctx *Context) Size(min, max int) *Context {
+	if ctx.err != nil {
+		return ctx
+	}
+
+	if length, ok := getLength(ctx.value); ok {
+		if length < min || length > max {
+			ctx.err = fmt.Errorf("%s must be in size of [%v, %v]!", ctx.name, min, max)
+			ctx.solveError(ctx.err)
 		}
 	}
+
+	return ctx
 }
 
+/*
 // generate a CheckFunc to check whether the length of value(string) in range of [min, max]
 //
 // (min <= utf8.RuneCountInString((value) <= max)
