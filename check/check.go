@@ -140,14 +140,13 @@ func (ctx *Context) IsURL() *Context {
 	return ctx
 }
 
-// check whether min <= value <= max (min&max must be a number)
+// check whether min <= value <= max
 func (ctx *Context) Range(min, max float64) *Context {
 	if ctx.err != nil {
 		return ctx
 	}
 
-	// TODO: value为int系列时转不了float64，还是另外写一个toFloat64函数吧……反正number类型可以枚举
-	if value, ok := ctx.value.(float64); ok {
+	if value, ok := toFloat64(ctx.value); ok {
 		if value < min || value > max {
 			ctx.err = fmt.Errorf("%s must be in range of [%v, %v]!", ctx.name, min, max)
 			ctx.solveError(ctx.err)
