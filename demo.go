@@ -13,12 +13,10 @@ func main() {
 			log.Println(err)
 		},
 	})
-	// TODO: 传指针时有问题!
-	// TODO: 另外要不写个测试文件吧,这样测太累了
-	// TODO: 测试Size,要求每一个都报错,且错在最后一个校验点上
+	// 测试要求下面每一个都报错,且都错在最后一个校验点上
 	a := 1
-	gs.Check("a", a).Size(1, 2).Range(2, 3)
-	gs.Check("a2", &a).Size(1, 2).Range(2, 3)
+	gs.Check("a", a).NotNil().Size(1, 2).Range(2, 3)
+	gs.Check("a2", &a).NotNil().Size(1, 2).Range(2, 3)
 	b := "1"
 	gs.Check("b", b).Size(1, 2).Size(0, 0)
 	gs.Check("b2", &b).Size(1, 2).Size(0, 0)
@@ -27,7 +25,7 @@ func main() {
 	gs.Check("c2", &c).Size(1, 2).Size(0, 0)
 	var d []int
 	gs.Check("d", d).Size(1, 2)
-	gs.Check("d", &d).Size(1, 2)
+	gs.Check("d2", &d).Size(1, 2)
 	e := [2]int{}
 	gs.Check("e", e).Size(1, 2).Size(0, 0)
 	gs.Check("e2", &e).Size(1, 2).Size(0, 0)

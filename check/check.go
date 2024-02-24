@@ -81,7 +81,7 @@ func (ctx *Context) NotBlank() *Context {
 		return ctx
 	}
 
-	if value, ok := ctx.value.(string); ok && strings.TrimSpace(value) == "" {
+	if value, ok := toString(ctx.value); ok && strings.TrimSpace(value) == "" {
 		ctx.err = fmt.Errorf("%s must not be blank!", ctx.name)
 		ctx.solveError(ctx.err)
 	}
@@ -95,7 +95,7 @@ func (ctx *Context) IsNumeric() *Context {
 		return ctx
 	}
 
-	if value, ok := ctx.value.(string); ok {
+	if value, ok := toString(ctx.value); ok {
 		for _, ch := range value {
 			if ch < '0' || ch > '9' {
 				ctx.err = fmt.Errorf("%s must be numeric!", ctx.name)
@@ -114,7 +114,7 @@ func (ctx *Context) IsEmail() *Context {
 		return ctx
 	}
 
-	if value, ok := ctx.value.(string); ok {
+	if value, ok := toString(ctx.value); ok {
 		if _, err := mail.ParseAddress(value); err != nil {
 			ctx.err = fmt.Errorf("%s is not a valid email!", ctx.name)
 			ctx.solveError(ctx.err)
@@ -130,7 +130,7 @@ func (ctx *Context) IsURL() *Context {
 		return ctx
 	}
 
-	if value, ok := ctx.value.(string); ok {
+	if value, ok := toString(ctx.value); ok {
 		if _, err := url.ParseRequestURI(value); err != nil {
 			ctx.err = fmt.Errorf("%s is not a valid URL!", ctx.name)
 			ctx.solveError(ctx.err)
