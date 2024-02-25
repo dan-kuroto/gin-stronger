@@ -8,6 +8,7 @@ import (
 
 var formatter = gp.Formatter{}
 
+// get length of string/array/chan/map/slice or pointer to them
 func getLength(data any) (length int, ok bool) {
 	if str, ok := toString(data); ok {
 		return len(str), true
@@ -30,6 +31,7 @@ func getLength(data any) (length int, ok bool) {
 	return length, ok
 }
 
+// convert to float64 from int/int8/.../uint/uint8/.../float32/float64 or their pointer
 func toFloat64(data any) (float64, bool) {
 	switch data := data.(type) {
 	case int:
@@ -85,6 +87,7 @@ func toFloat64(data any) (float64, bool) {
 	}
 }
 
+// convert string/*string to string
 func toString(data any) (string, bool) {
 	switch data := data.(type) {
 	case string:
@@ -94,4 +97,48 @@ func toString(data any) (string, bool) {
 	default:
 		return "", false
 	}
+}
+
+// convert bool/*bool to string
+func toBool(data any) (value bool, ok bool) {
+	switch data := data.(type) {
+	case bool:
+		return data, true
+	case *bool:
+		return *data, true
+	default:
+		return false, false
+	}
+}
+
+// Only valid for bool/int/int8/.../uint/uint8/.../float32/float64/string and their pointer.
+func basicEqual(a, b any) (equal bool, ok bool) {
+	// int/int8/.../uint/uint8/.../float32/float64
+	if a, ok := toFloat64(a); ok {
+		if b, ok := toFloat64(b); ok {
+			return a == b, true
+		} else {
+			return false, false
+		}
+	}
+
+	// bool
+	if a, ok := toBool(a); ok {
+		if b, ok := toBool(b); ok {
+			return a == b, true
+		} else {
+			return false, false
+		}
+	}
+
+	// string
+	if a, ok := toString(a); ok {
+		if b, ok := toString(b); ok {
+			return a == b, true
+		} else {
+			return false, false
+		}
+	}
+
+	return false, false
 }
