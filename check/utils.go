@@ -135,7 +135,7 @@ func basicEqual(a, b any) (equal bool, ok bool) {
 }
 
 // The type handling mechanism is the same as `basicEqual`.
-func basicGreater(a, b any) (equal bool, ok bool) {
+func basicGreater(a, b any) (greater bool, ok bool) {
 	// int/int8/.../uint/uint8/.../float32/float64
 	if a, ok := toFloat64(a); ok {
 		if b, ok := toFloat64(b); ok {
@@ -149,6 +149,29 @@ func basicGreater(a, b any) (equal bool, ok bool) {
 	if a, ok := toString(a); ok {
 		if b, ok := toString(b); ok {
 			return a > b, true
+		} else {
+			return false, false
+		}
+	}
+
+	return false, false
+}
+
+// The type handling mechanism is the same as `basicEqual`.
+func basicLess(a, b any) (less bool, ok bool) {
+	// int/int8/.../uint/uint8/.../float32/float64
+	if a, ok := toFloat64(a); ok {
+		if b, ok := toFloat64(b); ok {
+			return a < b, true
+		} else {
+			return false, false
+		}
+	}
+
+	// string
+	if a, ok := toString(a); ok {
+		if b, ok := toString(b); ok {
+			return a < b, true
 		} else {
 			return false, false
 		}

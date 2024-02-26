@@ -280,46 +280,61 @@ func (ctx *Context) Gt(expect any) *Context {
 	return ctx
 }
 
+// Check whether value >= expect. The type handling mechanism is the same as `Eq`.
+func (ctx *Context) Ge(expect any) *Context {
+	if ctx.err != nil {
+		return ctx
+	}
+
+	if less, ok := basicLess(ctx.value, expect); ok {
+		if less {
+			ctx.err = fmt.Errorf("%s must be greater than or equal to %s!", ctx.name, formatter.ToString(expect))
+			ctx.solveError(ctx.err)
+		}
+	} else {
+		ctx.printTypeWarning(".Ge(expect)")
+	}
+
+	return ctx
+}
+
+// Check whether value < expect. The type handling mechanism is the same as `Eq`.
+func (ctx *Context) Lt(expect any) *Context {
+	if ctx.err != nil {
+		return ctx
+	}
+
+	if less, ok := basicLess(ctx.value, expect); ok {
+		if !less {
+			ctx.err = fmt.Errorf("%s must be less than %s!", ctx.name, formatter.ToString(expect))
+			ctx.solveError(ctx.err)
+		}
+	} else {
+		ctx.printTypeWarning(".Lt(expect)")
+	}
+
+	return ctx
+}
+
+// Check whether value <= expect. The type handling mechanism is the same as `Eq`.
+func (ctx *Context) Le(expect any) *Context {
+	if ctx.err != nil {
+		return ctx
+	}
+
+	if greater, ok := basicGreater(ctx.value, expect); ok {
+		if greater {
+			ctx.err = fmt.Errorf("%s must be less than or equal to %s!", ctx.name, formatter.ToString(expect))
+			ctx.solveError(ctx.err)
+		}
+	} else {
+		ctx.printTypeWarning(".Le(expect)")
+	}
+
+	return ctx
+}
+
 /*
-// generate a CheckFunc to check whether value is greater than or equal to expect
-//
-// (value >= expect)
-func Ge[T orderable](expect T) CheckFunc[T] {
-	return func(data Context[T]) error {
-		if data.Value < expect {
-			return fmt.Errorf("%s must be greater than or equal to %s!", data.Name, formatter.ToString(expect))
-		} else {
-			return nil
-		}
-	}
-}
-
-// generate a CheckFunc to check whether value is less than expect
-//
-// (value < expect)
-func Lt[T orderable](expect T) CheckFunc[T] {
-	return func(data Context[T]) error {
-		if data.Value >= expect {
-			return fmt.Errorf("%s must be less than %s!", data.Name, formatter.ToString(expect))
-		} else {
-			return nil
-		}
-	}
-}
-
-// generate a CheckFunc to check whether value is less than or equal to expect
-//
-// (value <= expect)
-func Le[T orderable](expect T) CheckFunc[T] {
-	return func(data Context[T]) error {
-		if data.Value > expect {
-			return fmt.Errorf("%s must be less than or equal to %s!", data.Name, formatter.ToString(expect))
-		} else {
-			return nil
-		}
-	}
-}
-
 // generate a CheckFunc to check whether value is in expect
 func In[T comparable](expect ...T) CheckFunc[T] {
 	return func(data Context[T]) error {
