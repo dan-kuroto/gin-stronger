@@ -334,19 +334,23 @@ func (ctx *Context) Le(expect any) *Context {
 	return ctx
 }
 
-/*
-// generate a CheckFunc to check whether value is in expect
-func In[T comparable](expect ...T) CheckFunc[T] {
-	return func(data Context[T]) error {
-		for _, v := range expect {
-			if data.Value == v {
-				return nil
-			}
-		}
-		return fmt.Errorf("%s must be in %s!", data.Name, formatter.ToString(expect))
+// Check whether value is in expect.
+//
+// When compare value with items in expect, it is only valid for int/int8/.../uint/uint8/.../float32/float64/string and their pointer.
+func (ctx *Context) In(expect ...any) *Context {
+	if ctx.err != nil {
+		return ctx
 	}
+
+	if in := basicIn(ctx.value, expect); !in {
+		ctx.err = fmt.Errorf("%s must be in %s!", ctx.name, formatter.ToString(expect))
+		ctx.solveError(ctx.err)
+	}
+
+	return ctx
 }
 
+/*
 // generate a CheckFunc to check whether value is not in expect
 func NotIn[T comparable](expect ...T) CheckFunc[T] {
 	return func(data Context[T]) error {

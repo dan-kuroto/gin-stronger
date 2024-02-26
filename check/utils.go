@@ -179,3 +179,14 @@ func basicLess(a, b any) (less bool, ok bool) {
 
 	return false, false
 }
+
+// The type handling mechanism is the same as `basicEqual`.
+func basicIn(a any, b []any) bool {
+	// TODO: 这个实现完要严格测试下
+	for _, item := range b {
+		if equal, ok := basicEqual(a, item); ok && equal {
+			return true
+		}
+	}
+	return false
+}
