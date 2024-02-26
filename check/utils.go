@@ -111,7 +111,7 @@ func toBool(data any) (value bool, ok bool) {
 	}
 }
 
-// Only valid for bool/int/int8/.../uint/uint8/.../float32/float64/string and their pointer.
+// Only valid for int/int8/.../uint/uint8/.../float32/float64/string and their pointer.
 func basicEqual(a, b any) (equal bool, ok bool) {
 	// int/int8/.../uint/uint8/.../float32/float64
 	if a, ok := toFloat64(a); ok {
@@ -122,10 +122,24 @@ func basicEqual(a, b any) (equal bool, ok bool) {
 		}
 	}
 
-	// bool
-	if a, ok := toBool(a); ok {
-		if b, ok := toBool(b); ok {
+	// string
+	if a, ok := toString(a); ok {
+		if b, ok := toString(b); ok {
 			return a == b, true
+		} else {
+			return false, false
+		}
+	}
+
+	return false, false
+}
+
+// The type handling mechanism is the same as `basicEqual`.
+func basicGreater(a, b any) (equal bool, ok bool) {
+	// int/int8/.../uint/uint8/.../float32/float64
+	if a, ok := toFloat64(a); ok {
+		if b, ok := toFloat64(b); ok {
+			return a > b, true
 		} else {
 			return false, false
 		}
@@ -134,7 +148,7 @@ func basicEqual(a, b any) (equal bool, ok bool) {
 	// string
 	if a, ok := toString(a); ok {
 		if b, ok := toString(b); ok {
-			return a == b, true
+			return a > b, true
 		} else {
 			return false, false
 		}

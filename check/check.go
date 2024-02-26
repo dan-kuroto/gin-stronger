@@ -221,7 +221,7 @@ func (ctx *Context) Length(min, max int) *Context {
 
 // check whether value == expect
 //
-// Only valid for bool/int/int8/.../uint/uint8/.../float32/float64/string and their pointer.
+// Only valid for int/int8/.../uint/uint8/.../float32/float64/string and their pointer.
 //
 // It will also be invalid if the types do not match. For example:
 //
@@ -262,20 +262,25 @@ func (ctx *Context) Neq(expect any) *Context {
 	return ctx
 }
 
-/*
-// generate a CheckFunc to check whether value is greater than expect
-//
-// (value > expect)
-func Gt[T orderable](expect T) CheckFunc[T] {
-	return func(data Context[T]) error {
-		if data.Value <= expect {
-			return fmt.Errorf("%s must be greater than %s!", data.Name, formatter.ToString(expect))
-		} else {
-			return nil
-		}
+// Check whether value > expect. The type handling mechanism is the same as `Eq`.
+func (ctx *Context) Gt(expect any) *Context {
+	if ctx.err != nil {
+		return ctx
 	}
+
+	if greater, ok := basicGreater(ctx.value, expect); ok {
+		if !greater {
+			ctx.err = fmt.Errorf("%s must be greater than %s!", ctx.name, formatter.ToString(expect))
+			ctx.solveError(ctx.err)
+		}
+	} else {
+		ctx.printTypeWarning(".Gt(expect)")
+	}
+
+	return ctx
 }
 
+/*
 // generate a CheckFunc to check whether value is greater than or equal to expect
 //
 // (value >= expect)
