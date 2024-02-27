@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/mail"
 	"net/url"
+	"regexp"
 	"strings"
 	"unicode/utf8"
 )
@@ -39,7 +40,7 @@ func (ctx *Context) Error() error {
 }
 
 func (ctx *Context) printTypeWarning(checkMethod string) {
-	fmt.Printf("[WARNING] %s is invalid for the type of %s!\n", checkMethod, ctx.name)
+	printWarning("%s is invalid for the type of %s!", checkMethod, ctx.name)
 }
 
 func (ctx *Context) Assert(condition bool, errMsg string) *Context {
@@ -364,18 +365,28 @@ func (ctx *Context) NotIn(expect ...any) *Context {
 	return ctx
 }
 
-/*
-// generate a CheckFunc to check whether value matches expect (expect is a regexp)
-func Match(expect string) CheckFunc[string] {
-	return func(data Context[string]) error {
-		matched, err := regexp.MatchString(expect, data.Value)
-		if err != nil {
-			return err
-		}
-		if !matched {
-			return fmt.Errorf("%s must match /%s/!", data.Name, expect)
-		}
-		return nil
+// Check whether value matches expect (expect is a regexp)
+//
+// Only valid when value is string/*string
+func (ctx *Context) Match(expect string) *Context {
+	if ctx.err != nil {
+		return ctx
 	}
+
+	if value, ok := toString(ctx.value); ok {
+		if matched, err := regexp.MatchString(expect, value); err != nil {
+			printWarning(err.Error())
+			ctx.err = err
+			ctx.solveError(ctx.err)
+		} else {
+			if !matched {
+				ctx.err = fmt.Errorf("%s must match /%s/!", ctx.name, expect)
+				ctx.solveError(ctx.err)
+			}
+		}
+	} else {
+		ctx.printTypeWarning(".Match(expect)")
+	}
+
+	return ctx
 }
-*/
