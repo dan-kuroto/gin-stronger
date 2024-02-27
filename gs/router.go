@@ -1,8 +1,10 @@
 package gs
 
 import (
+	"log"
 	"net/http"
 
+	"github.com/dan-kuroto/gin-stronger/config"
 	"github.com/gin-gonic/gin"
 )
 
@@ -10,16 +12,16 @@ type HttpMethod uint16
 type StaticMapFunc func() map[string]string
 
 const (
-	GET     HttpMethod = 0b000000001
-	HEAD    HttpMethod = 0b000000010
-	POST    HttpMethod = 0b000000100
-	PUT     HttpMethod = 0b000001000
-	PATCH   HttpMethod = 0b000010000
-	DELETE  HttpMethod = 0b000100000
-	CONNECT HttpMethod = 0b001000000
-	OPTIONS HttpMethod = 0b010000000
-	TRACE   HttpMethod = 0b100000000
-	Any     HttpMethod = 0b111111111
+	GET HttpMethod = 1 << iota
+	HEAD
+	POST
+	PUT
+	PATCH
+	DELETE
+	CONNECT
+	OPTIONS
+	TRACE
+	Any = GET | HEAD | POST | PUT | PATCH | DELETE | CONNECT | OPTIONS | TRACE
 )
 
 var rootRouter = Router{Path: ""}
@@ -91,7 +93,7 @@ func handleRouter(router ginEngineOrGroup, gsRouter *Router) {
 	}
 }
 
-func addRouter(router ginEngineOrGroup, gsRouter *Router) {
+func AddRouter(router ginEngineOrGroup, gsRouter *Router) {
 	if len(gsRouter.Children) == 0 {
 		handleRouter(router, gsRouter)
 	} else {
@@ -100,12 +102,15 @@ func addRouter(router ginEngineOrGroup, gsRouter *Router) {
 			group.Use(gsRouter.MiddleWares...)
 		}
 		for _, subRouter := range gsRouter.Children {
-			addRouter(group, &subRouter)
+			AddRouter(group, &subRouter)
 		}
 	}
 }
 
-func initStatic(engine *gin.Engine) {
+func InitStatic(engine *gin.Engine) {
+	if staticMapFunc == nil {
+		return
+	}
 	for urlPath, filePath := range staticMapFunc() {
 		engine.Static(urlPath, filePath)
 	}
@@ -133,9 +138,12 @@ func SetStatic(getter StaticMapFunc) {
 	staticMapFunc = getter
 }
 
-func RunApp[T IConfiguration](config T) {
-	printBanner()
-	initConfig(config)
+func RunApp[T config.IConfiguration](config T) {
+	PrintBanner()
+	if err := InitConfig(config); err != nil {
+		log.Println("init config failed:", err.Error())
+	}
+	InitIdGenerators()
 
 	if Config.GetGinRelease() {
 		gin.SetMode(gin.ReleaseMode)
@@ -143,13 +151,13 @@ func RunApp[T IConfiguration](config T) {
 
 	engine := gin.Default()
 
-	addRouter(engine, &rootRouter)
-	initStatic(engine)
+	AddRouter(engine, &rootRouter)
+	InitStatic(engine)
 
 	engine.Run(Config.GetGinAddr())
 }
 
 // It is shorthand for gs.RunApp(&gs.Configuration{})
 func RunAppDefault() {
-	RunApp(&Configuration{})
+	RunApp(&config.Configuration{})
 }

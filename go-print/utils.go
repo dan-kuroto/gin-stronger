@@ -1,14 +1,14 @@
-package goprint
+package gp
 
 import "strings"
 
 // `isSeparate`: When there is no line break, whether a space needs to be added.
-func appendIndent(sb *strings.Builder, currIndent int, indents []int, isSeparate bool) {
+func appendIndent(sb *strings.Builder, currIndent int, indents []int, isSeparate bool, useColor bool) {
 	if currIndent > 0 {
 		sb.WriteString("\n")
-		for _, indent := range indents {
+		for i, indent := range indents {
 			if indent > 0 {
-				sb.WriteString("|")
+				appendColoredString(sb, "|", i, useColor, false)
 				sb.WriteString(strings.Repeat(" ", indent-1))
 			}
 		}
@@ -19,9 +19,13 @@ func appendIndent(sb *strings.Builder, currIndent int, indents []int, isSeparate
 	}
 }
 
-func appendColoredString(sb *strings.Builder, str string, colorIdx int, useColor bool) {
+func appendColoredString(sb *strings.Builder, str string, colorIdx int, useColor bool, bold bool) {
 	if useColor {
-		colors[colorIdx%len(colors)].Fprint(sb, str)
+		if bold {
+			boldColors[colorIdx%len(boldColors)].Fprint(sb, str)
+		} else {
+			normalColors[colorIdx%len(normalColors)].Fprint(sb, str)
+		}
 	} else {
 		sb.WriteString(str)
 	}

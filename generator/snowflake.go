@@ -1,19 +1,12 @@
-package gs
+package generator
 
 import (
-	"fmt"
-	"os"
+	"strconv"
 	"sync"
 	"time"
+
+	"github.com/dan-kuroto/gin-stronger/config"
 )
-
-type IdType interface {
-	int | int8 | int16 | int32 | int64 | uint | uint8 | uint16 | uint32 | uint64 | string
-}
-
-type IdGenerator[T IdType] interface {
-	NextId() T
-}
 
 const (
 	SNOW_FLAKE_SEQUENCE_BIT       int64 = 12
@@ -27,27 +20,32 @@ const (
 	SNOW_FLAKE_TIMESTMP_LEFT      int64 = SNOW_FLAKE_DATACENTER_LEFT + SNOW_FLAKE_DATACENTER_BIT
 )
 
-type snowFlake struct {
+type SnowFlakeGenerator struct {
 	// init: 0
 	sequence int64
 	// init: -1
 	lastStmp int64
 
-	mutex sync.Mutex
+	mutex  sync.Mutex
+	config config.IConfiguration
 }
 
-var SnowFlake snowFlake
+func NewSnowFlake(config config.IConfiguration) *SnowFlakeGenerator {
+	return &SnowFlakeGenerator{
+		lastStmp: -1,
+		config:   config,
+	}
+}
 
-func (s *snowFlake) NextId() int64 {
+func (s *SnowFlakeGenerator) NextId() int64 {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	snowflake := Config.GetSnowFlakeConfig()
+	snowflake := s.config.GetSnowFlakeConfig()
 
-	currStmp := getNewStmp()
+	currStmp := s.getCurrStmp()
 	if currStmp < s.lastStmp {
-		fmt.Println("Clock moved backwards. Refusing to generate id")
-		os.Exit(1)
+		panic("Clock moved backwards. Refusing to generate id!")
 	} else if currStmp == s.lastStmp {
 		s.sequence = (s.sequence + 1) & SNOW_FLAKE_MAX_SEQUENCE
 		if s.sequence == 0 {
@@ -64,18 +62,22 @@ func (s *snowFlake) NextId() int64 {
 		s.sequence
 }
 
-func (s *snowFlake) NextStrId() string {
-	return fmt.Sprint(s.NextId())
+func (s *SnowFlakeGenerator) NextStrId() string {
+	return strconv.FormatInt(s.NextId(), 10)
 }
 
-func (s *snowFlake) getNextMilli() int64 {
-	mill := getNewStmp()
+func (s *SnowFlakeGenerator) NextShortId() string {
+	return strconv.FormatInt(s.NextId(), 36)
+}
+
+func (s *SnowFlakeGenerator) getNextMilli() int64 {
+	mill := s.getCurrStmp()
 	for mill <= s.lastStmp {
-		mill = getNewStmp()
+		mill = s.getCurrStmp()
 	}
 	return mill
 }
 
-func getNewStmp() int64 {
+func (s *SnowFlakeGenerator) getCurrStmp() int64 {
 	return time.Now().UnixMilli()
 }

@@ -6,7 +6,7 @@ import (
 )
 
 // Print banner.txt if it exists.
-func printBanner() {
+func PrintBanner() {
 	if data, err := os.ReadFile("banner.txt"); err == nil {
 		fmt.Println(string(data))
 	}

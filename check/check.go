@@ -1,6 +1,7 @@
 package check
 
 import (
+	"errors"
 	"fmt"
 	"net/mail"
 	"net/url"
@@ -13,256 +14,379 @@ type Checker struct {
 	SolveError func(err error)
 }
 
-type Data[T any] struct {
-	Name  string
-	Value T
-}
-
-type CheckFunc[T any] func(data Data[T]) error
-
-type number interface {
-	int | int8 | int16 | int32 | int64 |
-		uint | uint8 | uint16 | uint32 | uint64 |
-		float32 | float64
-}
-
-type orderable interface {
-	number | rune | string
-}
-
-func CheckParam[T any](checker *Checker, name string, value T, checkFuncs ...CheckFunc[T]) {
-	data := Data[T]{Name: name, Value: value}
-	for _, checkFunc := range checkFuncs {
-		if err := checkFunc(data); err != nil {
-			checker.SolveError(err)
-		}
+func (checker *Checker) Check(name string, data any) *Context {
+	return &Context{
+		name:       name,
+		value:      data,
+		solveError: checker.SolveError,
 	}
 }
 
-func SimpleCheck(checker *Checker, condition bool, err error) {
+func (checker *Checker) Assert(condition bool, errMsg string) {
 	if !condition {
-		checker.SolveError(err)
+		checker.SolveError(errors.New(errMsg))
 	}
 }
 
-func NotNil[T any](data Data[*T]) error {
-	if data.Value == nil {
-		return fmt.Errorf("`%s` is required!", data.Name)
-	} else {
-		return nil
-	}
+type Context struct {
+	name       string
+	value      any
+	err        error
+	solveError func(err error)
 }
 
-func NotEmptyStr(data Data[string]) error {
-	if len(data.Value) == 0 {
-		return fmt.Errorf("`%s` must not be empty!", data.Name)
-	} else {
-		return nil
-	}
+func (ctx *Context) Error() error {
+	return ctx.err
 }
 
-func NotEmptyList[T any](data Data[[]T]) error {
-	if len(data.Value) == 0 {
-		return fmt.Errorf("`%s` must not be empty!", data.Name)
-	} else {
-		return nil
-	}
+func (ctx *Context) printTypeWarning(checkMethod string) {
+	printWarning("%s is invalid for the type of %s!", checkMethod, ctx.name)
 }
 
-func NotEmptyMap[K comparable, V any](data Data[map[K]V]) error {
-	if len(data.Value) == 0 {
-		return fmt.Errorf("`%s` must not be empty!", data.Name)
-	} else {
-		return nil
+func (ctx *Context) Assert(condition bool, errMsg string) *Context {
+	if ctx.err != nil {
+		return ctx
 	}
+
+	if !condition {
+		ctx.err = errors.New(errMsg)
+		ctx.solveError(ctx.err)
+	}
+
+	return ctx
 }
 
-func NotBlank(data Data[string]) error {
-	if strings.TrimSpace(data.Value) == "" {
-		return fmt.Errorf("`%s` must not be blank!", data.Name)
-	} else {
-		return nil
+func (ctx *Context) NotNil() *Context {
+	if ctx.err != nil {
+		return ctx
 	}
+
+	if ctx.value == nil {
+		ctx.err = fmt.Errorf("%s is required!", ctx.name)
+		ctx.solveError(ctx.err)
+	}
+
+	return ctx
+}
+
+func (ctx *Context) NotEmpty() *Context {
+	if ctx.err != nil {
+		return ctx
+	}
+
+	if length, ok := getLength(ctx.value); ok {
+		if length == 0 {
+			ctx.err = fmt.Errorf("%s must not be empty!", ctx.name)
+			ctx.solveError(ctx.err)
+		}
+	} else {
+		ctx.printTypeWarning(".NotEmpty()")
+	}
+
+	return ctx
+}
+
+func (ctx *Context) NotBlank() *Context {
+	if ctx.err != nil {
+		return ctx
+	}
+
+	if value, ok := toString(ctx.value); ok {
+		if strings.TrimSpace(value) == "" {
+			ctx.err = fmt.Errorf("%s must not be blank!", ctx.name)
+			ctx.solveError(ctx.err)
+		}
+	} else {
+		ctx.printTypeWarning(".NotBlank()")
+	}
+
+	return ctx
 }
 
 // check whether value consists of 0-9
-func IsNumeric(data Data[string]) error {
-	for _, ch := range data.Value {
-		if ch < '0' || ch > '9' {
-			return fmt.Errorf("`%s` must be numeric!", data.Name)
-		}
+func (ctx *Context) IsNumeric() *Context {
+	if ctx.err != nil {
+		return ctx
 	}
-	return nil
+
+	if value, ok := toString(ctx.value); ok {
+		for _, ch := range value {
+			if ch < '0' || ch > '9' {
+				ctx.err = fmt.Errorf("%s must be numeric!", ctx.name)
+				ctx.solveError(ctx.err)
+				break
+			}
+		}
+	} else {
+		ctx.printTypeWarning(".IsNumeric()")
+	}
+
+	return ctx
 }
 
 // check whether value is a valid email
-func IsEmail(data Data[string]) error {
-	if _, err := mail.ParseAddress(data.Value); err != nil {
-		return fmt.Errorf("`%s` is not a valid email!", data.Name)
+func (ctx *Context) IsEmail() *Context {
+	if ctx.err != nil {
+		return ctx
 	}
-	return nil
+
+	if value, ok := toString(ctx.value); ok {
+		if _, err := mail.ParseAddress(value); err != nil {
+			ctx.err = fmt.Errorf("%s is not a valid email!", ctx.name)
+			ctx.solveError(ctx.err)
+		}
+	} else {
+		ctx.printTypeWarning(".IsEmail()")
+	}
+
+	return ctx
 }
 
 // check whether value is a valid URL
-func IsURL(data Data[string]) error {
-	if _, err := url.ParseRequestURI(data.Value); err != nil {
-		return fmt.Errorf("`%s` is not a valid URL!", data.Name)
+func (ctx *Context) IsURL() *Context {
+	if ctx.err != nil {
+		return ctx
 	}
-	return nil
-}
 
-// generate a CheckFunc to check whether value in range of [min, max]
-//
-// (min <= value <= max)
-func Range[T number](min, max T) CheckFunc[T] {
-	return func(data Data[T]) error {
-		if data.Value < min || data.Value > max {
-			return fmt.Errorf("`%s` must be in range of [%v, %v]!", data.Name, min, max)
-		} else {
-			return nil
+	if value, ok := toString(ctx.value); ok {
+		if _, err := url.ParseRequestURI(value); err != nil {
+			ctx.err = fmt.Errorf("%s is not a valid URL!", ctx.name)
+			ctx.solveError(ctx.err)
 		}
+	} else {
+		ctx.printTypeWarning(".IsURL()")
 	}
+
+	return ctx
 }
 
-// generate a CheckFunc to check whether the size of value(slice, array, or map)
-// in range of [min, max]
+// check whether min <= value <= max
 //
-// (min <= len(value) <= max)
-func Size[T any](min, max int) CheckFunc[[]T] {
-	return func(data Data[[]T]) error {
-		if len(data.Value) < min || len(data.Value) > max {
-			return fmt.Errorf("`%s` must be in size of [%v, %v]!", data.Name, min, max)
-		} else {
-			return nil
-		}
+// Only valid for int/int8/.../uint/uint8/.../float32/float64 or pointer to them.
+func (ctx *Context) Range(min, max float64) *Context {
+	if ctx.err != nil {
+		return ctx
 	}
+
+	if value, ok := toFloat64(ctx.value); ok {
+		if value < min || value > max {
+			ctx.err = fmt.Errorf("%s must be in range of [%v, %v]!", ctx.name, min, max)
+			ctx.solveError(ctx.err)
+		}
+	} else {
+		ctx.printTypeWarning(".Range(min, max)")
+	}
+
+	return ctx
 }
 
-// generate a CheckFunc to check whether the length of value(string) in range of [min, max]
+// check whether min <= len(value) <= max (value can be string, slice, array, or map)
 //
-// (min <= utf8.RuneCountInString((value) <= max)
-func Length(min, max int) CheckFunc[string] {
-	return func(data Data[string]) error {
-		if utf8.RuneCountInString(data.Value) < min || utf8.RuneCountInString(data.Value) > max {
-			return fmt.Errorf("`%s` must be in length of [%v, %v]!", data.Name, min, max)
-		} else {
-			return nil
-		}
+// For string, what is checked is the number of bytes.
+// If you want to check the number of characters(rune), use `Length`.
+func (ctx *Context) Size(min, max int) *Context {
+	if ctx.err != nil {
+		return ctx
 	}
+
+	if length, ok := getLength(ctx.value); ok {
+		if length < min || length > max {
+			ctx.err = fmt.Errorf("%s must be in size of [%v, %v]!", ctx.name, min, max)
+			ctx.solveError(ctx.err)
+		}
+	} else {
+		ctx.printTypeWarning(".Size(min, max)")
+	}
+
+	return ctx
 }
 
-// generate a CheckFunc to check whether value is equal to expect
+// check whether min <= utf8.RuneCountInString(value) <= max
+func (ctx *Context) Length(min, max int) *Context {
+	if ctx.err != nil {
+		return ctx
+	}
+
+	if value, ok := toString(ctx.value); ok {
+		length := utf8.RuneCountInString(value)
+		if length < min || length > max {
+			ctx.err = fmt.Errorf("%s must be in length of [%v, %v]!", ctx.name, min, max)
+			ctx.solveError(ctx.err)
+		}
+	} else {
+		ctx.printTypeWarning(".Length(min, max)")
+	}
+
+	return ctx
+}
+
+// check whether value == expect
 //
-// (value == expect)
-func Eq[T comparable](expect T) CheckFunc[T] {
-	return func(data Data[T]) error {
-		if data.Value != expect {
-			return fmt.Errorf("`%s` must be equal to %s!", data.Name, formatter.ToString(expect))
-		} else {
-			return nil
-		}
-	}
-}
-
-// generate a CheckFunc to check whether value is not equal to expect
+// Only valid for int/int8/.../uint/uint8/.../float32/float64/string and their pointer.
 //
-// (value != expect)
-func Neq[T comparable](expect T) CheckFunc[T] {
-	return func(data Data[T]) error {
-		if data.Value == expect {
-			return fmt.Errorf("`%s` must not be equal to %s!", data.Name, formatter.ToString(expect))
-		} else {
-			return nil
-		}
-	}
-}
-
-// generate a CheckFunc to check whether value is greater than expect
+// It will also be invalid if the types do not match. For example:
 //
-// (value > expect)
-func Gt[T orderable](expect T) CheckFunc[T] {
-	return func(data Data[T]) error {
-		if data.Value <= expect {
-			return fmt.Errorf("`%s` must be greater than %s!", data.Name, formatter.ToString(expect))
-		} else {
-			return nil
-		}
+//	If value is int and expect is string, it is invalid;
+//	If value is int and expect is float32, it is valid.
+func (ctx *Context) Eq(expect any) *Context {
+	if ctx.err != nil {
+		return ctx
 	}
+
+	if equal, ok := basicEqual(ctx.value, expect); ok {
+		if !equal {
+			ctx.err = fmt.Errorf("%s must be equal to %s!", ctx.name, formatter.ToString(expect))
+			ctx.solveError(ctx.err)
+		}
+	} else {
+		ctx.printTypeWarning(".Eq(expect)")
+	}
+
+	return ctx
 }
 
-// generate a CheckFunc to check whether value is greater than or equal to expect
+// Check whether value != expect. The type handling mechanism is the same as `Eq`.
+func (ctx *Context) Neq(expect any) *Context {
+	if ctx.err != nil {
+		return ctx
+	}
+
+	if equal, ok := basicEqual(ctx.value, expect); ok {
+		if equal {
+			ctx.err = fmt.Errorf("%s must not be equal to %s!", ctx.name, formatter.ToString(expect))
+			ctx.solveError(ctx.err)
+		}
+	} else {
+		ctx.printTypeWarning(".Neq(expect)")
+	}
+
+	return ctx
+}
+
+// Check whether value > expect. The type handling mechanism is the same as `Eq`.
+func (ctx *Context) Gt(expect any) *Context {
+	if ctx.err != nil {
+		return ctx
+	}
+
+	if greater, ok := basicGreater(ctx.value, expect); ok {
+		if !greater {
+			ctx.err = fmt.Errorf("%s must be greater than %s!", ctx.name, formatter.ToString(expect))
+			ctx.solveError(ctx.err)
+		}
+	} else {
+		ctx.printTypeWarning(".Gt(expect)")
+	}
+
+	return ctx
+}
+
+// Check whether value >= expect. The type handling mechanism is the same as `Eq`.
+func (ctx *Context) Ge(expect any) *Context {
+	if ctx.err != nil {
+		return ctx
+	}
+
+	if less, ok := basicLess(ctx.value, expect); ok {
+		if less {
+			ctx.err = fmt.Errorf("%s must be greater than or equal to %s!", ctx.name, formatter.ToString(expect))
+			ctx.solveError(ctx.err)
+		}
+	} else {
+		ctx.printTypeWarning(".Ge(expect)")
+	}
+
+	return ctx
+}
+
+// Check whether value < expect. The type handling mechanism is the same as `Eq`.
+func (ctx *Context) Lt(expect any) *Context {
+	if ctx.err != nil {
+		return ctx
+	}
+
+	if less, ok := basicLess(ctx.value, expect); ok {
+		if !less {
+			ctx.err = fmt.Errorf("%s must be less than %s!", ctx.name, formatter.ToString(expect))
+			ctx.solveError(ctx.err)
+		}
+	} else {
+		ctx.printTypeWarning(".Lt(expect)")
+	}
+
+	return ctx
+}
+
+// Check whether value <= expect. The type handling mechanism is the same as `Eq`.
+func (ctx *Context) Le(expect any) *Context {
+	if ctx.err != nil {
+		return ctx
+	}
+
+	if greater, ok := basicGreater(ctx.value, expect); ok {
+		if greater {
+			ctx.err = fmt.Errorf("%s must be less than or equal to %s!", ctx.name, formatter.ToString(expect))
+			ctx.solveError(ctx.err)
+		}
+	} else {
+		ctx.printTypeWarning(".Le(expect)")
+	}
+
+	return ctx
+}
+
+// Check whether value is in expect.
 //
-// (value >= expect)
-func Ge[T orderable](expect T) CheckFunc[T] {
-	return func(data Data[T]) error {
-		if data.Value < expect {
-			return fmt.Errorf("`%s` must be greater than or equal to %s!", data.Name, formatter.ToString(expect))
-		} else {
-			return nil
-		}
+// When compare value with items in expect, it is only valid for int/int8/.../uint/uint8/.../float32/float64/string and their pointer.
+func (ctx *Context) In(expect ...any) *Context {
+	if ctx.err != nil {
+		return ctx
 	}
+
+	if in := basicIn(ctx.value, expect); !in {
+		ctx.err = fmt.Errorf("%s must be in %s!", ctx.name, formatter.ToString(expect))
+		ctx.solveError(ctx.err)
+	}
+
+	return ctx
 }
 
-// generate a CheckFunc to check whether value is less than expect
+// Check whether value is not in expect. The type handling mechanism is the same as `In`.
+func (ctx *Context) NotIn(expect ...any) *Context {
+	if ctx.err != nil {
+		return ctx
+	}
+
+	if in := basicIn(ctx.value, expect); in {
+		ctx.err = fmt.Errorf("%s must not be in %s!", ctx.name, formatter.ToString(expect))
+		ctx.solveError(ctx.err)
+	}
+
+	return ctx
+}
+
+// Check whether value matches expect (expect is a regexp)
 //
-// (value < expect)
-func Lt[T orderable](expect T) CheckFunc[T] {
-	return func(data Data[T]) error {
-		if data.Value >= expect {
-			return fmt.Errorf("`%s` must be less than %s!", data.Name, formatter.ToString(expect))
-		} else {
-			return nil
-		}
+// Only valid when value is string/*string
+func (ctx *Context) Match(expect string) *Context {
+	if ctx.err != nil {
+		return ctx
 	}
-}
 
-// generate a CheckFunc to check whether value is less than or equal to expect
-//
-// (value <= expect)
-func Le[T orderable](expect T) CheckFunc[T] {
-	return func(data Data[T]) error {
-		if data.Value > expect {
-			return fmt.Errorf("`%s` must be less than or equal to %s!", data.Name, formatter.ToString(expect))
+	if value, ok := toString(ctx.value); ok {
+		if matched, err := regexp.MatchString(expect, value); err != nil {
+			printWarning(err.Error())
+			ctx.err = err
+			ctx.solveError(ctx.err)
 		} else {
-			return nil
-		}
-	}
-}
-
-// generate a CheckFunc to check whether value is in expect
-func In[T comparable](expect ...T) CheckFunc[T] {
-	return func(data Data[T]) error {
-		for _, v := range expect {
-			if data.Value == v {
-				return nil
+			if !matched {
+				ctx.err = fmt.Errorf("%s must match /%s/!", ctx.name, expect)
+				ctx.solveError(ctx.err)
 			}
 		}
-		return fmt.Errorf("`%s` must be in %s!", data.Name, formatter.ToString(expect))
+	} else {
+		ctx.printTypeWarning(".Match(expect)")
 	}
-}
 
-// generate a CheckFunc to check whether value is not in expect
-func NotIn[T comparable](expect ...T) CheckFunc[T] {
-	return func(data Data[T]) error {
-		for _, v := range expect {
-			if data.Value == v {
-				return fmt.Errorf("`%s` must not be in %s!", data.Name, formatter.ToString(expect))
-			}
-		}
-		return nil
-	}
-}
-
-// generate a CheckFunc to check whether value matches expect (expect is a regexp)
-func Match(expect string) CheckFunc[string] {
-	return func(data Data[string]) error {
-		matched, err := regexp.MatchString(expect, data.Value)
-		if err != nil {
-			return err
-		}
-		if !matched {
-			return fmt.Errorf("`%s` must match /%s/!", data.Name, expect)
-		}
-		return nil
-	}
+	return ctx
 }
