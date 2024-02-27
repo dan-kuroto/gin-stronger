@@ -350,19 +350,21 @@ func (ctx *Context) In(expect ...any) *Context {
 	return ctx
 }
 
-/*
-// generate a CheckFunc to check whether value is not in expect
-func NotIn[T comparable](expect ...T) CheckFunc[T] {
-	return func(data Context[T]) error {
-		for _, v := range expect {
-			if data.Value == v {
-				return fmt.Errorf("%s must not be in %s!", data.Name, formatter.ToString(expect))
-			}
-		}
-		return nil
+// Check whether value is not in expect. The type handling mechanism is the same as `In`.
+func (ctx *Context) NotIn(expect ...any) *Context {
+	if ctx.err != nil {
+		return ctx
 	}
+
+	if in := basicIn(ctx.value, expect); in {
+		ctx.err = fmt.Errorf("%s must not be in %s!", ctx.name, formatter.ToString(expect))
+		ctx.solveError(ctx.err)
+	}
+
+	return ctx
 }
 
+/*
 // generate a CheckFunc to check whether value matches expect (expect is a regexp)
 func Match(expect string) CheckFunc[string] {
 	return func(data Context[string]) error {
