@@ -21,3 +21,7 @@ func Check(name string, data any) *check.Context {
 func Assert(condition bool, errMsg string) {
 	defaultChecker.Assert(condition, errMsg)
 }
+
+func AssertError(err error) {
+	defaultChecker.AssertError(err)
+}
