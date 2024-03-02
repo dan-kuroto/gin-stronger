@@ -17,3 +17,7 @@ func SetDefaultChecker(checker *check.Checker) {
 func Check(name string, data any) *check.Context {
 	return defaultChecker.Check(name, data)
 }
+
+func Assert(condition bool, errMsg string) {
+	defaultChecker.Assert(condition, errMsg)
+}
