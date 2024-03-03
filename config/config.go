@@ -2,9 +2,6 @@ package config
 
 import (
 	"fmt"
-	"os"
-
-	"gopkg.in/yaml.v3"
 )
 
 type IConfiguration interface {
@@ -13,7 +10,6 @@ type IConfiguration interface {
 	GetGinAddr() string
 	GetSnowFlakeConfig() SnowFlakeConfig
 
-	InitByYaml(baseName string, env string) error
 	SolveDefaultValue()
 }
 
@@ -58,25 +54,6 @@ func (config *Configuration) GetGinRelease() bool {
 
 func (config *Configuration) GetGinAddr() string {
 	return fmt.Sprintf("%s:%d", config.Gin.Host, config.Gin.Port)
-}
-
-// If env is empty string, init config by {name}.yml, otherwise {name}-{env}.yml
-func (config *Configuration) InitByYaml(baseName string, env string) error {
-	var fpath string
-	if env == "" {
-		fpath = baseName + ".yml"
-	} else {
-		fpath = baseName + "-" + env + ".yml"
-	}
-
-	data, err := os.ReadFile(fpath)
-	if err != nil {
-		return err
-	}
-	if err := yaml.Unmarshal(data, &config); err != nil {
-		return err
-	}
-	return nil
 }
 
 func (config *Configuration) SolveDefaultValue() {

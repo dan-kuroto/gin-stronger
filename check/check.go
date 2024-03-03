@@ -28,6 +28,12 @@ func (checker *Checker) Assert(condition bool, errMsg string) {
 	}
 }
 
+func (checker *Checker) AssertError(err error) {
+	if err != nil {
+		checker.SolveError(err)
+	}
+}
+
 type Context struct {
 	name       string
 	value      any
@@ -50,6 +56,19 @@ func (ctx *Context) Assert(condition bool, errMsg string) *Context {
 
 	if !condition {
 		ctx.err = errors.New(errMsg)
+		ctx.solveError(ctx.err)
+	}
+
+	return ctx
+}
+
+func (ctx *Context) AssertError(err error) *Context {
+	if ctx.err != nil {
+		return ctx
+	}
+
+	if err != nil {
+		ctx.err = err
 		ctx.solveError(ctx.err)
 	}
 
