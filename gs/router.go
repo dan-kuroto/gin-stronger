@@ -143,6 +143,9 @@ func RunApp[T config.IConfiguration](config T) {
 	if err := InitConfig(config); err != nil {
 		log.Println("init config failed:", err.Error())
 	}
+	if onConfigInitialized != nil {
+		onConfigInitialized()
+	}
 	InitIdGenerators()
 
 	if Config.GetGinRelease() {

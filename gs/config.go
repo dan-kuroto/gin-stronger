@@ -12,6 +12,8 @@ import (
 // default config instance
 var Config config.IConfiguration
 
+var onConfigInitialized func()
+
 // Load config from application.yml, application-{env}.yml and cmd parameters.
 // (`env` is given by application.yml)
 func InitConfig[T config.IConfiguration](config T) error {
@@ -51,4 +53,9 @@ func initConfigByYaml[T config.IConfiguration](config T, baseName string, env st
 		return err
 	}
 	return nil
+}
+
+// task() will be called after config is inited
+func OnConfigInitialized(task func()) {
+	onConfigInitialized = task
 }
