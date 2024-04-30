@@ -36,7 +36,7 @@ type Formatter struct {
 	BracketColor  bool
 }
 
-var Default = Formatter{
+var DefaultFormatter = Formatter{
 	StructIndent: 2, ListDisplayNum: 100, MapDisplayNum: 100, BracketColor: true,
 }
 
@@ -64,7 +64,7 @@ var (
 )
 
 func ToString(data any) string {
-	return Default.ToString(data)
+	return DefaultFormatter.ToString(data)
 }
 
 func (f *Formatter) ToString(data any) string {
@@ -72,6 +72,7 @@ func (f *Formatter) ToString(data any) string {
 }
 
 func (f *Formatter) toString(data any, indents []int) string {
+	// BUG: 前几天测试遇到panic，可能是什么地方遍历对象没考虑private
 	value := reflect.ValueOf(data)
 	switch value.Kind() {
 	case reflect.String:
