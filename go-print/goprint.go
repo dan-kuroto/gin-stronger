@@ -34,10 +34,19 @@ type Formatter struct {
 	// If `len(data) > MapDisplayNum`, extra parts are shown as ellipsis.
 	MapDisplayNum int
 	BracketColor  bool
+	// Determines whether to display strings with quotes.
+	//
+	// When the string is nested (e.g., within a slice, struct, or similar composite),
+	// it will always appear enclosed in quotes, regardless of the value of StrQuote.
+	StrQuote bool
 }
 
 var DefaultFormatter = Formatter{
-	StructIndent: 2, ListDisplayNum: 100, MapDisplayNum: 100, BracketColor: true,
+	StructIndent:   2,
+	ListDisplayNum: 100,
+	MapDisplayNum:  100,
+	BracketColor:   true,
+	StrQuote:       true,
 }
 
 var (
@@ -76,7 +85,11 @@ func (f *Formatter) toString(data any, indents []int) string {
 	value := reflect.ValueOf(data)
 	switch value.Kind() {
 	case reflect.String:
-		return fmt.Sprintf("%q", data)
+		if f.StrQuote && len(indents) != 0 {
+			return fmt.Sprintf("%q", data)
+		} else {
+			return fmt.Sprint(data)
+		}
 	case reflect.Pointer:
 		if value.IsNil() {
 			return fmt.Sprintf("<%s nil>", f.typeToString(value.Type()))
