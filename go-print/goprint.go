@@ -42,7 +42,6 @@ type Formatter struct {
 }
 
 var DefaultFormatter = Formatter{
-	StructIndent:   2,
 	ListDisplayNum: 100,
 	MapDisplayNum:  100,
 	BracketColor:   true,
@@ -275,7 +274,7 @@ func (f *Formatter) funcOutTypeString(type_ reflect.Type) string {
 
 func (f *Formatter) structToString(value reflect.Value, indents []int) string {
 	type_ := value.Type()
-	var fields map[int]reflect.StructField
+	var fields = make(map[int]reflect.StructField)
 	for i := 0; i < value.NumField(); i++ {
 		field := type_.Field(i)
 		if field.IsExported() {
