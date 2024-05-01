@@ -262,11 +262,11 @@ func (f *Formatter) funcOutTypeString(type_ reflect.Type) string {
 
 func (f *Formatter) structToString(value reflect.Value, indents []int) string {
 	type_ := value.Type()
-	var fields []reflect.StructField
+	var fields map[int]reflect.StructField
 	for i := 0; i < value.NumField(); i++ {
 		field := type_.Field(i)
 		if field.IsExported() {
-			fields = append(fields, field)
+			fields[i] = field
 		}
 	}
 	length := len(fields)
@@ -277,13 +277,15 @@ func (f *Formatter) structToString(value reflect.Value, indents []int) string {
 	if length > 0 {
 		indents = append(indents, f.StructIndent)
 		appendIndent(&sb, f.StructIndent, indents, true, f.BracketColor)
+		cnt := 0
 		for i, field := range fields {
 			sb.WriteString(field.Name)
 			sb.WriteString("=")
 			sb.WriteString(f.toString(value.Field(i).Interface(), indents))
-			if i < length-1 {
+			if cnt < length-1 {
 				appendIndent(&sb, f.StructIndent, indents, true, f.BracketColor)
 			}
+			cnt++
 		}
 		indents = indents[:len(indents)-1]
 		appendIndent(&sb, f.StructIndent, indents, false, f.BracketColor)
