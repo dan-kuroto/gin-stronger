@@ -9,6 +9,10 @@ import (
 )
 
 type Formatter struct {
+	// MaxIndentLayer specifies the maximum indentation level for formatting.
+	// A value <= 0 allows unlimited indentation, while non-zero values
+	// will hide additional indentation beyond the specified limit.
+	MaxIndentLayer int
 	// indent for array&list
 	ListIndent int
 	// indent for map
@@ -25,6 +29,10 @@ type Formatter struct {
 	// If true, example: <map[string, any] :len=3 "a"=1>
 	// Otherwise, example: {"a": 1}
 	MapShowAsTag bool
+	// Max number for display items in struct.
+	// If `StructDisplayNum <= 0`, means infinity.
+	// If `len(data) > StructDisplayNum`, extra parts are shown as ellipsis.
+	StructDisplayNum int
 	// Max number for display items in array&list.
 	// If `ListDisplayNum <= 0`, means infinity.
 	// If `len(data) > ListDisplayNum`, extra parts are shown as ellipsis.
@@ -42,10 +50,12 @@ type Formatter struct {
 }
 
 var DefaultFormatter = Formatter{
-	ListDisplayNum: 100,
-	MapDisplayNum:  100,
-	BracketColor:   true,
-	StrQuote:       true,
+	MaxIndentLayer:   10,
+	ListDisplayNum:   100,
+	MapDisplayNum:    100,
+	StructDisplayNum: 100,
+	BracketColor:     true,
+	StrQuote:         true,
 }
 
 var (
@@ -80,7 +90,8 @@ func (f *Formatter) ToString(data any) string {
 }
 
 func (f *Formatter) toString(data any, indents []int) string {
-	// BUG: 有时候报stack overflow，怀疑是有结构体循环引用自己导致无限递归
+	// TODO: 无限递归问题解决了，但仍然会重复递归，希望相同的地址不要出现第二次
+	// TODO: 试试把struct pointer的地址移动到标签内
 	value := reflect.ValueOf(data)
 	switch value.Kind() {
 	case reflect.String:
@@ -96,7 +107,8 @@ func (f *Formatter) toString(data any, indents []int) string {
 		if !value.CanInterface() {
 			return fmt.Sprintf("%#v", data)
 		}
-		return "&" + f.toString(value.Elem().Interface(), indents)
+		return fmt.Sprintf("&%#v", value.Pointer()) +
+			f.toString(value.Elem().Interface(), indents)
 	case reflect.Array:
 		return f.listToString(value, indents, true)
 	case reflect.Slice:
@@ -121,6 +133,9 @@ func (f *Formatter) listToString(value reflect.Value, indents []int, isArray boo
 	if f.ListDisplayNum > 0 && length > f.ListDisplayNum {
 		displayLength = f.ListDisplayNum
 	}
+	if f.MaxIndentLayer > 0 && len(indents) >= f.MaxIndentLayer {
+		displayLength = 0
+	}
 
 	if f.ListShowAsTag {
 		appendColoredString(&sb, fmt.Sprint("<", f.typeToString(value.Type())), len(indents), f.BracketColor, true)
@@ -131,7 +146,7 @@ func (f *Formatter) listToString(value reflect.Value, indents []int, isArray boo
 		}
 	}
 	appendColoredString(&sb, "[", len(indents), f.BracketColor, true)
-	if displayLength > 0 {
+	if displayLength > 0 { // can show items
 		indents = append(indents, f.ListIndent)
 		appendIndent(&sb, f.ListIndent, indents, false, f.BracketColor)
 		for i := 0; i < displayLength; i++ {
@@ -147,6 +162,8 @@ func (f *Formatter) listToString(value reflect.Value, indents []int, isArray boo
 		}
 		indents = indents[:len(indents)-1]
 		appendIndent(&sb, f.ListIndent, indents, false, f.BracketColor)
+	} else if length > 0 { // cannot show items, but actually has items
+		sb.WriteString("...")
 	}
 	appendColoredString(&sb, "]", len(indents), f.BracketColor, true)
 	if f.ListShowAsTag {
@@ -163,6 +180,9 @@ func (f *Formatter) mapToString(value reflect.Value, indents []int) string {
 	if f.MapDisplayNum > 0 && length > f.MapDisplayNum {
 		displayLength = f.MapDisplayNum
 	}
+	if f.MaxIndentLayer > 0 && len(indents) >= f.MaxIndentLayer {
+		displayLength = 0
+	}
 
 	if f.MapShowAsTag {
 		appendColoredString(&sb, fmt.Sprint("<", f.typeToString(value.Type())), len(indents), f.BracketColor, true)
@@ -170,7 +190,7 @@ func (f *Formatter) mapToString(value reflect.Value, indents []int) string {
 	} else {
 		appendColoredString(&sb, "{", len(indents), f.BracketColor, true)
 	}
-	if displayLength > 0 {
+	if displayLength > 0 { // can show items
 		indents = append(indents, f.MapIndent)
 		appendIndent(&sb, f.MapIndent, indents, f.MapShowAsTag, f.BracketColor)
 		for i, key := range value.MapKeys() {
@@ -199,6 +219,8 @@ func (f *Formatter) mapToString(value reflect.Value, indents []int) string {
 		}
 		indents = indents[:len(indents)-1]
 		appendIndent(&sb, f.MapIndent, indents, false, f.BracketColor)
+	} else if length > 0 { // cannot show items, but actually has items
+		sb.WriteString("...")
 	}
 	if f.MapShowAsTag {
 		appendColoredString(&sb, ">", len(indents), f.BracketColor, true)
@@ -282,11 +304,18 @@ func (f *Formatter) structToString(value reflect.Value, indents []int) string {
 		}
 	}
 	length := len(fields)
+	displayLength := length
+	if f.StructDisplayNum > 0 && length > f.StructDisplayNum {
+		displayLength = f.StructDisplayNum
+	}
+	if f.MaxIndentLayer > 0 && len(indents) >= f.MaxIndentLayer {
+		displayLength = 0
+	}
 
 	var sb strings.Builder
 
 	appendColoredString(&sb, fmt.Sprint("<", f.typeToString(type_)), len(indents), f.BracketColor, true)
-	if length > 0 {
+	if displayLength > 0 { // can show items
 		indents = append(indents, f.StructIndent)
 		appendIndent(&sb, f.StructIndent, indents, true, f.BracketColor)
 		cnt := 0
@@ -294,13 +323,21 @@ func (f *Formatter) structToString(value reflect.Value, indents []int) string {
 			sb.WriteString(field.Name)
 			sb.WriteString("=")
 			sb.WriteString(f.toString(value.Field(i).Interface(), indents))
-			if cnt < length-1 {
+			if cnt < displayLength-1 { // before the last one
 				appendIndent(&sb, f.StructIndent, indents, true, f.BracketColor)
+			} else { // last one
+				if displayLength < length { // need ellipsis
+					appendIndent(&sb, f.StructIndent, indents, true, f.BracketColor)
+					sb.WriteString("...")
+				}
+				break
 			}
 			cnt++
 		}
 		indents = indents[:len(indents)-1]
 		appendIndent(&sb, f.StructIndent, indents, false, f.BracketColor)
+	} else if length > 0 { // cannot show items, but actually has items
+		sb.WriteString(" ...")
 	}
 	appendColoredString(&sb, ">", len(indents), f.BracketColor, true)
 
