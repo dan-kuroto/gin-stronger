@@ -19,9 +19,6 @@ func NewLogger(pkgName string) *Logger {
 	}
 	logger.SetFlags(log.Ldate | log.Lmicroseconds | log.Lshortfile)
 
-	// TODO: 在Println等情况真正用上gs.Formatter
-	logger.formatter = &DefaultFormatter
-
 	return logger
 }
 
@@ -30,7 +27,7 @@ func (l *Logger) UseFormatter(formatter *Formatter) *Logger {
 	return l
 }
 
-func (l *Logger) UseStdFormatter() *Logger {
-	l.formatter = nil
-	return l
+func (l *Logger) UseGpFormatter() *Logger {
+	// TODO: 在Println等情况真正用上gs.Formatter
+	return l.UseFormatter(&DefaultFormatter)
 }
