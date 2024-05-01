@@ -72,7 +72,7 @@ func (f *Formatter) ToString(data any) string {
 }
 
 func (f *Formatter) toString(data any, indents []int) string {
-	// BUG: 前几天测试遇到panic，可能是什么地方遍历对象没考虑private
+	// BUG: 有时候报stack overflow，怀疑是有结构体循环引用自己导致无限递归
 	value := reflect.ValueOf(data)
 	switch value.Kind() {
 	case reflect.String:
