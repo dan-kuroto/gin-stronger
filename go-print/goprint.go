@@ -94,12 +94,11 @@ func ToString(data any) string {
 }
 
 func (f *Formatter) ToString(data any) string {
-	return f.toString(data, &gpfContext{VistedPinters: map[uintptr]bool{}})
+	return f.toString(data, gpfContext{VistedPinters: map[uintptr]bool{}})
 }
 
-func (f *Formatter) toString(data any, ctx *gpfContext) string {
+func (f *Formatter) toString(data any, ctx gpfContext) string {
 	// TODO: 无限递归问题解决了，但仍然会重复递归，希望相同的地址不要出现第二次
-	// TODO: 试试把struct pointer的地址移动到标签内
 	value := reflect.ValueOf(data)
 	switch value.Kind() {
 	case reflect.String:
@@ -116,19 +115,19 @@ func (f *Formatter) toString(data any, ctx *gpfContext) string {
 			return fmt.Sprintf("%#v", data)
 		}
 		ctx.CurrPtr = value.Pointer()
-		defer func() { ctx.CurrPtr = 0 }()
 		return "&" + f.toString(value.Elem().Interface(), ctx)
 	case reflect.Array:
 		ctx.IsArray = true
-		defer func() { ctx.IsArray = false }()
 		return f.listToString(value, ctx)
 	case reflect.Slice:
 		ctx.IsArray = false
+		ctx.CurrPtr = value.Pointer()
 		return f.listToString(value, ctx)
 	case reflect.Map:
+		ctx.CurrPtr = value.Pointer()
 		return f.mapToString(value, ctx)
 	case reflect.Chan:
-		return fmt.Sprintf("<%s len=%d cap=%d ptr=%#x>", f.typeToString(value.Type()), value.Len(), value.Cap(), value.Pointer())
+		return fmt.Sprintf("<%s :len=%d :cap=%d :ptr=%#x>", f.typeToString(value.Type()), value.Len(), value.Cap(), value.Pointer())
 	case reflect.Struct:
 		return f.structToString(value, ctx)
 	case reflect.Func:
@@ -138,7 +137,7 @@ func (f *Formatter) toString(data any, ctx *gpfContext) string {
 	}
 }
 
-func (f *Formatter) listToString(value reflect.Value, ctx *gpfContext) string {
+func (f *Formatter) listToString(value reflect.Value, ctx gpfContext) string {
 	var sb strings.Builder
 	length := value.Len()
 	displayLength := length
@@ -151,11 +150,16 @@ func (f *Formatter) listToString(value reflect.Value, ctx *gpfContext) string {
 
 	if f.ListShowAsTag {
 		appendColoredString(&sb, fmt.Sprint("<", f.typeToString(value.Type())), len(ctx.Indents), f.BracketColor, true)
-		if ctx.IsArray {
-			sb.WriteString(" items=")
-		} else {
-			sb.WriteString(fmt.Sprintf(" :len=%d :cap=%d items=", value.Len(), value.Cap()))
+		if !ctx.IsArray {
+			sb.WriteString(fmt.Sprintf(" :len=%d :cap=%d", value.Len(), value.Cap()))
 		}
+		if ctx.CurrPtr != 0 { // pointer
+			sb.WriteString(fmt.Sprintf(" :ptr=%#x", ctx.CurrPtr))
+		}
+		sb.WriteString(" :items=")
+	}
+	if ctx.CurrPtr != 0 { // reset after use
+		ctx.CurrPtr = 0
 	}
 	appendColoredString(&sb, "[", len(ctx.Indents), f.BracketColor, true)
 	if displayLength > 0 { // can show items
@@ -185,7 +189,7 @@ func (f *Formatter) listToString(value reflect.Value, ctx *gpfContext) string {
 	return sb.String()
 }
 
-func (f *Formatter) mapToString(value reflect.Value, ctx *gpfContext) string {
+func (f *Formatter) mapToString(value reflect.Value, ctx gpfContext) string {
 	var sb strings.Builder
 	length := value.Len()
 	displayLength := length
@@ -199,8 +203,14 @@ func (f *Formatter) mapToString(value reflect.Value, ctx *gpfContext) string {
 	if f.MapShowAsTag {
 		appendColoredString(&sb, fmt.Sprint("<", f.typeToString(value.Type())), len(ctx.Indents), f.BracketColor, true)
 		sb.WriteString(fmt.Sprintf(" :len=%d", value.Len()))
+		if ctx.CurrPtr != 0 { // pointer
+			sb.WriteString(fmt.Sprintf(" :ptr=%#x", ctx.CurrPtr))
+		}
 	} else {
 		appendColoredString(&sb, "{", len(ctx.Indents), f.BracketColor, true)
+	}
+	if ctx.CurrPtr != 0 { // reset after use
+		ctx.CurrPtr = 0
 	}
 	if displayLength > 0 { // can show items
 		ctx.Indents = append(ctx.Indents, f.MapIndent)
@@ -306,7 +316,7 @@ func (f *Formatter) funcReturnsTypeString(type_ reflect.Type) string {
 	return sb.String()
 }
 
-func (f *Formatter) structToString(value reflect.Value, ctx *gpfContext) string {
+func (f *Formatter) structToString(value reflect.Value, ctx gpfContext) string {
 	type_ := value.Type()
 	var fields = make(map[int]reflect.StructField)
 	for i := 0; i < value.NumField(); i++ {
@@ -327,6 +337,11 @@ func (f *Formatter) structToString(value reflect.Value, ctx *gpfContext) string 
 	var sb strings.Builder
 
 	appendColoredString(&sb, fmt.Sprint("<", f.typeToString(type_)), len(ctx.Indents), f.BracketColor, true)
+	if ctx.CurrPtr != 0 { // pointer
+		sb.WriteString(fmt.Sprintf(" :ptr=%#x", ctx.CurrPtr))
+		// reset after use
+		ctx.CurrPtr = 0
+	}
 	if displayLength > 0 { // can show items
 		ctx.Indents = append(ctx.Indents, f.StructIndent)
 		appendIndent(&sb, f.StructIndent, ctx.Indents, true, f.BracketColor)
@@ -363,7 +378,7 @@ func (f *Formatter) funcToString(value reflect.Value) string {
 	if value.IsNil() {
 		sb.WriteString(" nil")
 	} else {
-		sb.WriteString(fmt.Sprintf(" ptr=%#x", value.Pointer()))
+		sb.WriteString(fmt.Sprintf(" :ptr=%#x", value.Pointer()))
 	}
 	sb.WriteString(">")
 	return sb.String()
