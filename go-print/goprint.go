@@ -9,6 +9,10 @@ import (
 )
 
 type Formatter struct {
+	// MaxIndentLayer specifies the maximum indentation level for formatting.
+	// A value <= 0 allows unlimited indentation, while non-zero values
+	// will hide additional indentation beyond the specified limit.
+	MaxIndentLayer int
 	// indent for array&list
 	ListIndent int
 	// indent for map
@@ -25,6 +29,10 @@ type Formatter struct {
 	// If true, example: <map[string, any] :len=3 "a"=1>
 	// Otherwise, example: {"a": 1}
 	MapShowAsTag bool
+	// Max number for display items in struct.
+	// If `StructDisplayNum <= 0`, means infinity.
+	// If `len(data) > StructDisplayNum`, extra parts are shown as ellipsis.
+	StructDisplayNum int
 	// Max number for display items in array&list.
 	// If `ListDisplayNum <= 0`, means infinity.
 	// If `len(data) > ListDisplayNum`, extra parts are shown as ellipsis.
@@ -34,10 +42,31 @@ type Formatter struct {
 	// If `len(data) > MapDisplayNum`, extra parts are shown as ellipsis.
 	MapDisplayNum int
 	BracketColor  bool
+	// Determines whether to display strings with quotes.
+	//
+	// When the string is nested (e.g., within a slice, struct, or similar composite),
+	// it will always appear enclosed in quotes, regardless of the value of StrQuote.
+	StrQuote bool
 }
 
-var Default = Formatter{
-	StructIndent: 2, ListDisplayNum: 100, MapDisplayNum: 100, BracketColor: true,
+// context for go-print Formatter
+type gpfContext struct {
+	Indents []int
+	IsArray bool
+	// Primarily to resolve the problem to fetch the address of struct pointer.
+	CurrPtr uintptr
+	// A map of visited pointers to prevent infinite recursion.
+	// Therefore, actually only pointer of list/map/struct are stored.
+	VistedPointers map[uintptr]bool
+}
+
+var DefaultFormatter = Formatter{
+	MaxIndentLayer:   10,
+	ListDisplayNum:   100,
+	MapDisplayNum:    100,
+	StructDisplayNum: 100,
+	BracketColor:     true,
+	StrQuote:         true,
 }
 
 var (
@@ -64,18 +93,22 @@ var (
 )
 
 func ToString(data any) string {
-	return Default.ToString(data)
+	return DefaultFormatter.ToString(data)
 }
 
 func (f *Formatter) ToString(data any) string {
-	return f.toString(data, []int{})
+	return f.toString(data, gpfContext{VistedPointers: map[uintptr]bool{}})
 }
 
-func (f *Formatter) toString(data any, indents []int) string {
+func (f *Formatter) toString(data any, ctx gpfContext) string {
 	value := reflect.ValueOf(data)
 	switch value.Kind() {
 	case reflect.String:
-		return fmt.Sprintf("%q", data)
+		if f.StrQuote && len(ctx.Indents) != 0 {
+			return fmt.Sprintf("%q", data)
+		} else {
+			return fmt.Sprint(data)
+		}
 	case reflect.Pointer:
 		if value.IsNil() {
 			return fmt.Sprintf("<%s nil>", f.typeToString(value.Type()))
@@ -83,17 +116,22 @@ func (f *Formatter) toString(data any, indents []int) string {
 		if !value.CanInterface() {
 			return fmt.Sprintf("%#v", data)
 		}
-		return "&" + f.toString(value.Elem().Interface(), indents)
+		ctx.CurrPtr = value.Pointer()
+		return "&" + f.toString(value.Elem().Interface(), ctx)
 	case reflect.Array:
-		return f.listToString(value, indents, true)
+		ctx.IsArray = true
+		return f.listToString(value, ctx)
 	case reflect.Slice:
-		return f.listToString(value, indents, false)
+		ctx.IsArray = false
+		ctx.CurrPtr = value.Pointer()
+		return f.listToString(value, ctx)
 	case reflect.Map:
-		return f.mapToString(value, indents)
+		ctx.CurrPtr = value.Pointer()
+		return f.mapToString(value, ctx)
 	case reflect.Chan:
-		return fmt.Sprintf("<%s len=%d cap=%d ptr=%#x>", f.typeToString(value.Type()), value.Len(), value.Cap(), value.Pointer())
+		return fmt.Sprintf("<%s :len=%d :cap=%d :ptr=%#x>", f.typeToString(value.Type()), value.Len(), value.Cap(), value.Pointer())
 	case reflect.Struct:
-		return f.structToString(value, indents)
+		return f.structToString(value, ctx)
 	case reflect.Func:
 		return f.funcToString(value)
 	default:
@@ -101,96 +139,132 @@ func (f *Formatter) toString(data any, indents []int) string {
 	}
 }
 
-func (f *Formatter) listToString(value reflect.Value, indents []int, isArray bool) string {
+func (f *Formatter) listToString(value reflect.Value, ctx gpfContext) string {
 	var sb strings.Builder
 	length := value.Len()
 	displayLength := length
 	if f.ListDisplayNum > 0 && length > f.ListDisplayNum {
 		displayLength = f.ListDisplayNum
 	}
+	if f.MaxIndentLayer > 0 && len(ctx.Indents) >= f.MaxIndentLayer {
+		displayLength = 0
+	}
 
 	if f.ListShowAsTag {
-		appendColoredString(&sb, fmt.Sprint("<", f.typeToString(value.Type())), len(indents), f.BracketColor, true)
-		if isArray {
-			sb.WriteString(" items=")
-		} else {
-			sb.WriteString(fmt.Sprintf(" :len=%d :cap=%d items=", value.Len(), value.Cap()))
+		appendColoredString(&sb, fmt.Sprint("<", f.typeToString(value.Type())), len(ctx.Indents), f.BracketColor, true)
+		if !ctx.IsArray {
+			sb.WriteString(fmt.Sprintf(" :len=%d :cap=%d", value.Len(), value.Cap()))
 		}
+		if ctx.CurrPtr != 0 { // pointer
+			sb.WriteString(fmt.Sprintf(" :ptr=%#x", ctx.CurrPtr))
+		}
+		sb.WriteString(" :items=")
 	}
-	appendColoredString(&sb, "[", len(indents), f.BracketColor, true)
-	if displayLength > 0 {
-		indents = append(indents, f.ListIndent)
-		appendIndent(&sb, f.ListIndent, indents, false, f.BracketColor)
+	if ctx.CurrPtr != 0 {
+		if ctx.VistedPointers[ctx.CurrPtr] { // skip visited pointer
+			displayLength = 0
+		} else { // store unvisited pointer
+			ctx.VistedPointers[ctx.CurrPtr] = true
+		}
+		// reset after use
+		ctx.CurrPtr = 0
+	}
+	appendColoredString(&sb, "[", len(ctx.Indents), f.BracketColor, true)
+	if displayLength > 0 { // can show items
+		ctx.Indents = append(ctx.Indents, f.ListIndent)
+		appendIndent(&sb, f.ListIndent, ctx.Indents, false, f.BracketColor)
 		for i := 0; i < displayLength; i++ {
-			sb.WriteString(f.toString(value.Index(i).Interface(), indents))
+			sb.WriteString(f.toString(value.Index(i).Interface(), ctx))
 			if i < displayLength-1 { // before the last one
 				sb.WriteString(",")
-				appendIndent(&sb, f.ListIndent, indents, true, f.BracketColor)
+				appendIndent(&sb, f.ListIndent, ctx.Indents, true, f.BracketColor)
 			} else if displayLength < length { // last one, but need ellipsis
 				sb.WriteString(",")
-				appendIndent(&sb, f.ListIndent, indents, true, f.BracketColor)
+				appendIndent(&sb, f.ListIndent, ctx.Indents, true, f.BracketColor)
 				sb.WriteString("...")
 			}
 		}
-		indents = indents[:len(indents)-1]
-		appendIndent(&sb, f.ListIndent, indents, false, f.BracketColor)
+		ctx.Indents = ctx.Indents[:len(ctx.Indents)-1]
+		appendIndent(&sb, f.ListIndent, ctx.Indents, false, f.BracketColor)
+	} else if length > 0 { // cannot show items, but actually has items
+		sb.WriteString("...")
 	}
-	appendColoredString(&sb, "]", len(indents), f.BracketColor, true)
+	appendColoredString(&sb, "]", len(ctx.Indents), f.BracketColor, true)
 	if f.ListShowAsTag {
-		appendColoredString(&sb, ">", len(indents), f.BracketColor, true)
+		appendColoredString(&sb, ">", len(ctx.Indents), f.BracketColor, true)
 	}
 
 	return sb.String()
 }
 
-func (f *Formatter) mapToString(value reflect.Value, indents []int) string {
+func (f *Formatter) mapToString(value reflect.Value, ctx gpfContext) string {
 	var sb strings.Builder
 	length := value.Len()
 	displayLength := length
 	if f.MapDisplayNum > 0 && length > f.MapDisplayNum {
 		displayLength = f.MapDisplayNum
 	}
+	if f.MaxIndentLayer > 0 && len(ctx.Indents) >= f.MaxIndentLayer {
+		displayLength = 0
+	}
 
 	if f.MapShowAsTag {
-		appendColoredString(&sb, fmt.Sprint("<", f.typeToString(value.Type())), len(indents), f.BracketColor, true)
+		appendColoredString(&sb, fmt.Sprint("<", f.typeToString(value.Type())), len(ctx.Indents), f.BracketColor, true)
 		sb.WriteString(fmt.Sprintf(" :len=%d", value.Len()))
+		if ctx.CurrPtr != 0 { // pointer
+			sb.WriteString(fmt.Sprintf(" :ptr=%#x", ctx.CurrPtr))
+		}
 	} else {
-		appendColoredString(&sb, "{", len(indents), f.BracketColor, true)
+		appendColoredString(&sb, "{", len(ctx.Indents), f.BracketColor, true)
 	}
-	if displayLength > 0 {
-		indents = append(indents, f.MapIndent)
-		appendIndent(&sb, f.MapIndent, indents, f.MapShowAsTag, f.BracketColor)
+	if ctx.CurrPtr != 0 {
+		if ctx.VistedPointers[ctx.CurrPtr] { // skip visited pointer
+			displayLength = 0
+		} else { // store unvisited pointer
+			ctx.VistedPointers[ctx.CurrPtr] = true
+		}
+		// reset after use
+		ctx.CurrPtr = 0
+	}
+	if displayLength > 0 { // can show items
+		ctx.Indents = append(ctx.Indents, f.MapIndent)
+		appendIndent(&sb, f.MapIndent, ctx.Indents, f.MapShowAsTag, f.BracketColor)
 		for i, key := range value.MapKeys() {
-			sb.WriteString(f.toString(key.Interface(), indents))
+			sb.WriteString(f.toString(key.Interface(), ctx))
 			if f.MapShowAsTag {
 				sb.WriteString("=")
 			} else {
 				sb.WriteString(": ")
 			}
-			sb.WriteString(f.toString(value.MapIndex(key).Interface(), indents))
+			sb.WriteString(f.toString(value.MapIndex(key).Interface(), ctx))
 			if i < displayLength-1 { // before the last one
 				if !f.MapShowAsTag {
 					sb.WriteString(",")
 				}
-				appendIndent(&sb, f.MapIndent, indents, true, f.BracketColor)
+				appendIndent(&sb, f.MapIndent, ctx.Indents, true, f.BracketColor)
 			} else { // last one
 				if displayLength < length { // need ellipsis
 					if !f.MapShowAsTag {
 						sb.WriteString(",")
 					}
-					appendIndent(&sb, f.MapIndent, indents, true, f.BracketColor)
+					appendIndent(&sb, f.MapIndent, ctx.Indents, true, f.BracketColor)
 					sb.WriteString("...")
 				}
 				break
 			}
 		}
-		indents = indents[:len(indents)-1]
-		appendIndent(&sb, f.MapIndent, indents, false, f.BracketColor)
+		ctx.Indents = ctx.Indents[:len(ctx.Indents)-1]
+		appendIndent(&sb, f.MapIndent, ctx.Indents, false, f.BracketColor)
+	} else if length > 0 { // cannot show items, but actually has items
+		if f.MapShowAsTag {
+			sb.WriteRune(' ')
+		}
+		sb.WriteString("...")
 	}
 	if f.MapShowAsTag {
-		appendColoredString(&sb, ">", len(indents), f.BracketColor, true)
+		appendColoredString(&sb, ">", len(ctx.Indents), f.BracketColor, true)
 	} else {
-		appendColoredString(&sb, "}", len(indents), f.BracketColor, true)
+		appendColoredString(&sb, "}", len(ctx.Indents), f.BracketColor, true)
 	}
 
 	return sb.String()
@@ -209,7 +283,7 @@ func (f *Formatter) typeToString(type_ reflect.Type) string {
 	case reflect.Chan:
 		return fmt.Sprintf("chan[%s]", f.typeToString(type_.Elem()))
 	case reflect.Func:
-		return fmt.Sprintf("func[%s -> %s]", f.funcInTypeString(type_), f.funcOutTypeString(type_))
+		return fmt.Sprintf("func[%s -> %s]", f.funcParamsTypeToString(type_), f.funcReturnsTypeString(type_))
 	default:
 		if type_.Name() == "" {
 			return "?"
@@ -219,7 +293,7 @@ func (f *Formatter) typeToString(type_ reflect.Type) string {
 	}
 }
 
-func (f *Formatter) funcInTypeString(type_ reflect.Type) string {
+func (f *Formatter) funcParamsTypeToString(type_ reflect.Type) string {
 	numIn := type_.NumIn()
 	if numIn == 0 {
 		return "()"
@@ -239,7 +313,7 @@ func (f *Formatter) funcInTypeString(type_ reflect.Type) string {
 	return sb.String()
 }
 
-func (f *Formatter) funcOutTypeString(type_ reflect.Type) string {
+func (f *Formatter) funcReturnsTypeString(type_ reflect.Type) string {
 	numOut := type_.NumOut()
 	if numOut == 0 {
 		return "()"
@@ -259,35 +333,63 @@ func (f *Formatter) funcOutTypeString(type_ reflect.Type) string {
 	return sb.String()
 }
 
-func (f *Formatter) structToString(value reflect.Value, indents []int) string {
+func (f *Formatter) structToString(value reflect.Value, ctx gpfContext) string {
 	type_ := value.Type()
-	var fields []reflect.StructField
+	var fields = make(map[int]reflect.StructField)
 	for i := 0; i < value.NumField(); i++ {
 		field := type_.Field(i)
 		if field.IsExported() {
-			fields = append(fields, field)
+			fields[i] = field
 		}
 	}
 	length := len(fields)
+	displayLength := length
+	if f.StructDisplayNum > 0 && length > f.StructDisplayNum {
+		displayLength = f.StructDisplayNum
+	}
+	if f.MaxIndentLayer > 0 && len(ctx.Indents) >= f.MaxIndentLayer {
+		displayLength = 0
+	}
 
 	var sb strings.Builder
 
-	appendColoredString(&sb, fmt.Sprint("<", f.typeToString(type_)), len(indents), f.BracketColor, true)
-	if length > 0 {
-		indents = append(indents, f.StructIndent)
-		appendIndent(&sb, f.StructIndent, indents, true, f.BracketColor)
+	appendColoredString(&sb, fmt.Sprint("<", f.typeToString(type_)), len(ctx.Indents), f.BracketColor, true)
+	if ctx.CurrPtr != 0 { // pointer
+		sb.WriteString(fmt.Sprintf(" :ptr=%#x", ctx.CurrPtr))
+
+		if ctx.VistedPointers[ctx.CurrPtr] { // skip visited pointer
+			displayLength = 0
+		} else { // store unvisited pointer
+			ctx.VistedPointers[ctx.CurrPtr] = true
+		}
+		// reset after use
+		ctx.CurrPtr = 0
+	}
+	if displayLength > 0 { // can show items
+		ctx.Indents = append(ctx.Indents, f.StructIndent)
+		appendIndent(&sb, f.StructIndent, ctx.Indents, true, f.BracketColor)
+		cnt := 0
 		for i, field := range fields {
 			sb.WriteString(field.Name)
 			sb.WriteString("=")
-			sb.WriteString(f.toString(value.Field(i).Interface(), indents))
-			if i < length-1 {
-				appendIndent(&sb, f.StructIndent, indents, true, f.BracketColor)
+			sb.WriteString(f.toString(value.Field(i).Interface(), ctx))
+			if cnt < displayLength-1 { // before the last one
+				appendIndent(&sb, f.StructIndent, ctx.Indents, true, f.BracketColor)
+			} else { // last one
+				if displayLength < length { // need ellipsis
+					appendIndent(&sb, f.StructIndent, ctx.Indents, true, f.BracketColor)
+					sb.WriteString("...")
+				}
+				break
 			}
+			cnt++
 		}
-		indents = indents[:len(indents)-1]
-		appendIndent(&sb, f.StructIndent, indents, false, f.BracketColor)
+		ctx.Indents = ctx.Indents[:len(ctx.Indents)-1]
+		appendIndent(&sb, f.StructIndent, ctx.Indents, false, f.BracketColor)
+	} else if length > 0 { // cannot show items, but actually has items
+		sb.WriteString(" ...")
 	}
-	appendColoredString(&sb, ">", len(indents), f.BracketColor, true)
+	appendColoredString(&sb, ">", len(ctx.Indents), f.BracketColor, true)
 
 	return sb.String()
 }
@@ -299,7 +401,7 @@ func (f *Formatter) funcToString(value reflect.Value) string {
 	if value.IsNil() {
 		sb.WriteString(" nil")
 	} else {
-		sb.WriteString(fmt.Sprintf(" ptr=%#x", value.Pointer()))
+		sb.WriteString(fmt.Sprintf(" :ptr=%#x", value.Pointer()))
 	}
 	sb.WriteString(">")
 	return sb.String()
