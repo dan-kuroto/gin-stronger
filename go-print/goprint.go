@@ -49,6 +49,14 @@ type Formatter struct {
 	StrQuote bool
 }
 
+// context for go-print Formatter
+type gpfContext struct {
+	Indents       []int
+	IsArray       bool
+	CurrPtr       uintptr
+	VistedPinters map[uintptr]bool
+}
+
 var DefaultFormatter = Formatter{
 	MaxIndentLayer:   10,
 	ListDisplayNum:   100,
@@ -86,16 +94,16 @@ func ToString(data any) string {
 }
 
 func (f *Formatter) ToString(data any) string {
-	return f.toString(data, []int{})
+	return f.toString(data, &gpfContext{VistedPinters: map[uintptr]bool{}})
 }
 
-func (f *Formatter) toString(data any, indents []int) string {
+func (f *Formatter) toString(data any, ctx *gpfContext) string {
 	// TODO: 无限递归问题解决了，但仍然会重复递归，希望相同的地址不要出现第二次
 	// TODO: 试试把struct pointer的地址移动到标签内
 	value := reflect.ValueOf(data)
 	switch value.Kind() {
 	case reflect.String:
-		if f.StrQuote && len(indents) != 0 {
+		if f.StrQuote && len(ctx.Indents) != 0 {
 			return fmt.Sprintf("%q", data)
 		} else {
 			return fmt.Sprint(data)
@@ -107,18 +115,22 @@ func (f *Formatter) toString(data any, indents []int) string {
 		if !value.CanInterface() {
 			return fmt.Sprintf("%#v", data)
 		}
-		return fmt.Sprintf("&%#v", value.Pointer()) +
-			f.toString(value.Elem().Interface(), indents)
+		ctx.CurrPtr = value.Pointer()
+		defer func() { ctx.CurrPtr = 0 }()
+		return "&" + f.toString(value.Elem().Interface(), ctx)
 	case reflect.Array:
-		return f.listToString(value, indents, true)
+		ctx.IsArray = true
+		defer func() { ctx.IsArray = false }()
+		return f.listToString(value, ctx)
 	case reflect.Slice:
-		return f.listToString(value, indents, false)
+		ctx.IsArray = false
+		return f.listToString(value, ctx)
 	case reflect.Map:
-		return f.mapToString(value, indents)
+		return f.mapToString(value, ctx)
 	case reflect.Chan:
 		return fmt.Sprintf("<%s len=%d cap=%d ptr=%#x>", f.typeToString(value.Type()), value.Len(), value.Cap(), value.Pointer())
 	case reflect.Struct:
-		return f.structToString(value, indents)
+		return f.structToString(value, ctx)
 	case reflect.Func:
 		return f.funcToString(value)
 	default:
@@ -126,106 +138,106 @@ func (f *Formatter) toString(data any, indents []int) string {
 	}
 }
 
-func (f *Formatter) listToString(value reflect.Value, indents []int, isArray bool) string {
+func (f *Formatter) listToString(value reflect.Value, ctx *gpfContext) string {
 	var sb strings.Builder
 	length := value.Len()
 	displayLength := length
 	if f.ListDisplayNum > 0 && length > f.ListDisplayNum {
 		displayLength = f.ListDisplayNum
 	}
-	if f.MaxIndentLayer > 0 && len(indents) >= f.MaxIndentLayer {
+	if f.MaxIndentLayer > 0 && len(ctx.Indents) >= f.MaxIndentLayer {
 		displayLength = 0
 	}
 
 	if f.ListShowAsTag {
-		appendColoredString(&sb, fmt.Sprint("<", f.typeToString(value.Type())), len(indents), f.BracketColor, true)
-		if isArray {
+		appendColoredString(&sb, fmt.Sprint("<", f.typeToString(value.Type())), len(ctx.Indents), f.BracketColor, true)
+		if ctx.IsArray {
 			sb.WriteString(" items=")
 		} else {
 			sb.WriteString(fmt.Sprintf(" :len=%d :cap=%d items=", value.Len(), value.Cap()))
 		}
 	}
-	appendColoredString(&sb, "[", len(indents), f.BracketColor, true)
+	appendColoredString(&sb, "[", len(ctx.Indents), f.BracketColor, true)
 	if displayLength > 0 { // can show items
-		indents = append(indents, f.ListIndent)
-		appendIndent(&sb, f.ListIndent, indents, false, f.BracketColor)
+		ctx.Indents = append(ctx.Indents, f.ListIndent)
+		appendIndent(&sb, f.ListIndent, ctx.Indents, false, f.BracketColor)
 		for i := 0; i < displayLength; i++ {
-			sb.WriteString(f.toString(value.Index(i).Interface(), indents))
+			sb.WriteString(f.toString(value.Index(i).Interface(), ctx))
 			if i < displayLength-1 { // before the last one
 				sb.WriteString(",")
-				appendIndent(&sb, f.ListIndent, indents, true, f.BracketColor)
+				appendIndent(&sb, f.ListIndent, ctx.Indents, true, f.BracketColor)
 			} else if displayLength < length { // last one, but need ellipsis
 				sb.WriteString(",")
-				appendIndent(&sb, f.ListIndent, indents, true, f.BracketColor)
+				appendIndent(&sb, f.ListIndent, ctx.Indents, true, f.BracketColor)
 				sb.WriteString("...")
 			}
 		}
-		indents = indents[:len(indents)-1]
-		appendIndent(&sb, f.ListIndent, indents, false, f.BracketColor)
+		ctx.Indents = ctx.Indents[:len(ctx.Indents)-1]
+		appendIndent(&sb, f.ListIndent, ctx.Indents, false, f.BracketColor)
 	} else if length > 0 { // cannot show items, but actually has items
 		sb.WriteString("...")
 	}
-	appendColoredString(&sb, "]", len(indents), f.BracketColor, true)
+	appendColoredString(&sb, "]", len(ctx.Indents), f.BracketColor, true)
 	if f.ListShowAsTag {
-		appendColoredString(&sb, ">", len(indents), f.BracketColor, true)
+		appendColoredString(&sb, ">", len(ctx.Indents), f.BracketColor, true)
 	}
 
 	return sb.String()
 }
 
-func (f *Formatter) mapToString(value reflect.Value, indents []int) string {
+func (f *Formatter) mapToString(value reflect.Value, ctx *gpfContext) string {
 	var sb strings.Builder
 	length := value.Len()
 	displayLength := length
 	if f.MapDisplayNum > 0 && length > f.MapDisplayNum {
 		displayLength = f.MapDisplayNum
 	}
-	if f.MaxIndentLayer > 0 && len(indents) >= f.MaxIndentLayer {
+	if f.MaxIndentLayer > 0 && len(ctx.Indents) >= f.MaxIndentLayer {
 		displayLength = 0
 	}
 
 	if f.MapShowAsTag {
-		appendColoredString(&sb, fmt.Sprint("<", f.typeToString(value.Type())), len(indents), f.BracketColor, true)
+		appendColoredString(&sb, fmt.Sprint("<", f.typeToString(value.Type())), len(ctx.Indents), f.BracketColor, true)
 		sb.WriteString(fmt.Sprintf(" :len=%d", value.Len()))
 	} else {
-		appendColoredString(&sb, "{", len(indents), f.BracketColor, true)
+		appendColoredString(&sb, "{", len(ctx.Indents), f.BracketColor, true)
 	}
 	if displayLength > 0 { // can show items
-		indents = append(indents, f.MapIndent)
-		appendIndent(&sb, f.MapIndent, indents, f.MapShowAsTag, f.BracketColor)
+		ctx.Indents = append(ctx.Indents, f.MapIndent)
+		appendIndent(&sb, f.MapIndent, ctx.Indents, f.MapShowAsTag, f.BracketColor)
 		for i, key := range value.MapKeys() {
-			sb.WriteString(f.toString(key.Interface(), indents))
+			sb.WriteString(f.toString(key.Interface(), ctx))
 			if f.MapShowAsTag {
 				sb.WriteString("=")
 			} else {
 				sb.WriteString(": ")
 			}
-			sb.WriteString(f.toString(value.MapIndex(key).Interface(), indents))
+			sb.WriteString(f.toString(value.MapIndex(key).Interface(), ctx))
 			if i < displayLength-1 { // before the last one
 				if !f.MapShowAsTag {
 					sb.WriteString(",")
 				}
-				appendIndent(&sb, f.MapIndent, indents, true, f.BracketColor)
+				appendIndent(&sb, f.MapIndent, ctx.Indents, true, f.BracketColor)
 			} else { // last one
 				if displayLength < length { // need ellipsis
 					if !f.MapShowAsTag {
 						sb.WriteString(",")
 					}
-					appendIndent(&sb, f.MapIndent, indents, true, f.BracketColor)
+					appendIndent(&sb, f.MapIndent, ctx.Indents, true, f.BracketColor)
 					sb.WriteString("...")
 				}
 				break
 			}
 		}
-		indents = indents[:len(indents)-1]
-		appendIndent(&sb, f.MapIndent, indents, false, f.BracketColor)
+		ctx.Indents = ctx.Indents[:len(ctx.Indents)-1]
+		appendIndent(&sb, f.MapIndent, ctx.Indents, false, f.BracketColor)
 	} else if length > 0 { // cannot show items, but actually has items
 		sb.WriteString("...")
 	}
 	if f.MapShowAsTag {
-		appendColoredString(&sb, ">", len(indents), f.BracketColor, true)
+		appendColoredString(&sb, ">", len(ctx.Indents), f.BracketColor, true)
 	} else {
-		appendColoredString(&sb, "}", len(indents), f.BracketColor, true)
+		appendColoredString(&sb, "}", len(ctx.Indents), f.BracketColor, true)
 	}
 
 	return sb.String()
@@ -244,7 +256,7 @@ func (f *Formatter) typeToString(type_ reflect.Type) string {
 	case reflect.Chan:
 		return fmt.Sprintf("chan[%s]", f.typeToString(type_.Elem()))
 	case reflect.Func:
-		return fmt.Sprintf("func[%s -> %s]", f.funcInTypeString(type_), f.funcOutTypeString(type_))
+		return fmt.Sprintf("func[%s -> %s]", f.funcParamsTypeToString(type_), f.funcReturnsTypeString(type_))
 	default:
 		if type_.Name() == "" {
 			return "?"
@@ -254,7 +266,7 @@ func (f *Formatter) typeToString(type_ reflect.Type) string {
 	}
 }
 
-func (f *Formatter) funcInTypeString(type_ reflect.Type) string {
+func (f *Formatter) funcParamsTypeToString(type_ reflect.Type) string {
 	numIn := type_.NumIn()
 	if numIn == 0 {
 		return "()"
@@ -274,7 +286,7 @@ func (f *Formatter) funcInTypeString(type_ reflect.Type) string {
 	return sb.String()
 }
 
-func (f *Formatter) funcOutTypeString(type_ reflect.Type) string {
+func (f *Formatter) funcReturnsTypeString(type_ reflect.Type) string {
 	numOut := type_.NumOut()
 	if numOut == 0 {
 		return "()"
@@ -294,7 +306,7 @@ func (f *Formatter) funcOutTypeString(type_ reflect.Type) string {
 	return sb.String()
 }
 
-func (f *Formatter) structToString(value reflect.Value, indents []int) string {
+func (f *Formatter) structToString(value reflect.Value, ctx *gpfContext) string {
 	type_ := value.Type()
 	var fields = make(map[int]reflect.StructField)
 	for i := 0; i < value.NumField(); i++ {
@@ -308,38 +320,38 @@ func (f *Formatter) structToString(value reflect.Value, indents []int) string {
 	if f.StructDisplayNum > 0 && length > f.StructDisplayNum {
 		displayLength = f.StructDisplayNum
 	}
-	if f.MaxIndentLayer > 0 && len(indents) >= f.MaxIndentLayer {
+	if f.MaxIndentLayer > 0 && len(ctx.Indents) >= f.MaxIndentLayer {
 		displayLength = 0
 	}
 
 	var sb strings.Builder
 
-	appendColoredString(&sb, fmt.Sprint("<", f.typeToString(type_)), len(indents), f.BracketColor, true)
+	appendColoredString(&sb, fmt.Sprint("<", f.typeToString(type_)), len(ctx.Indents), f.BracketColor, true)
 	if displayLength > 0 { // can show items
-		indents = append(indents, f.StructIndent)
-		appendIndent(&sb, f.StructIndent, indents, true, f.BracketColor)
+		ctx.Indents = append(ctx.Indents, f.StructIndent)
+		appendIndent(&sb, f.StructIndent, ctx.Indents, true, f.BracketColor)
 		cnt := 0
 		for i, field := range fields {
 			sb.WriteString(field.Name)
 			sb.WriteString("=")
-			sb.WriteString(f.toString(value.Field(i).Interface(), indents))
+			sb.WriteString(f.toString(value.Field(i).Interface(), ctx))
 			if cnt < displayLength-1 { // before the last one
-				appendIndent(&sb, f.StructIndent, indents, true, f.BracketColor)
+				appendIndent(&sb, f.StructIndent, ctx.Indents, true, f.BracketColor)
 			} else { // last one
 				if displayLength < length { // need ellipsis
-					appendIndent(&sb, f.StructIndent, indents, true, f.BracketColor)
+					appendIndent(&sb, f.StructIndent, ctx.Indents, true, f.BracketColor)
 					sb.WriteString("...")
 				}
 				break
 			}
 			cnt++
 		}
-		indents = indents[:len(indents)-1]
-		appendIndent(&sb, f.StructIndent, indents, false, f.BracketColor)
+		ctx.Indents = ctx.Indents[:len(ctx.Indents)-1]
+		appendIndent(&sb, f.StructIndent, ctx.Indents, false, f.BracketColor)
 	} else if length > 0 { // cannot show items, but actually has items
 		sb.WriteString(" ...")
 	}
-	appendColoredString(&sb, ">", len(indents), f.BracketColor, true)
+	appendColoredString(&sb, ">", len(ctx.Indents), f.BracketColor, true)
 
 	return sb.String()
 }
