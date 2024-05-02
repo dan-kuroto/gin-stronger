@@ -256,7 +256,10 @@ func (f *Formatter) mapToString(value reflect.Value, ctx gpfContext) string {
 		ctx.Indents = ctx.Indents[:len(ctx.Indents)-1]
 		appendIndent(&sb, f.MapIndent, ctx.Indents, false, f.BracketColor)
 	} else if length > 0 { // cannot show items, but actually has items
-		sb.WriteString(" ...")
+		if f.MapShowAsTag {
+			sb.WriteRune(' ')
+		}
+		sb.WriteString("...")
 	}
 	if f.MapShowAsTag {
 		appendColoredString(&sb, ">", len(ctx.Indents), f.BracketColor, true)

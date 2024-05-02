@@ -29,7 +29,7 @@ func (l *Logger) UseFormatter(formatter *Formatter) *Logger {
 	return l
 }
 
-func (l *Logger) UseStdFormatter() *Logger {
+func (l *Logger) ClearFormatter() *Logger {
 	return l.UseFormatter(nil)
 }
 
