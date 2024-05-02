@@ -51,10 +51,13 @@ type Formatter struct {
 
 // context for go-print Formatter
 type gpfContext struct {
-	Indents       []int
-	IsArray       bool
-	CurrPtr       uintptr
-	VistedPinters map[uintptr]bool
+	Indents []int
+	IsArray bool
+	// Primarily to resolve the problem to fetch the address of struct pointer.
+	CurrPtr uintptr
+	// A map of visited pointers to prevent infinite recursion.
+	// Therefore, actually only pointer of list/map/struct are stored.
+	VistedPointers map[uintptr]bool
 }
 
 var DefaultFormatter = Formatter{
@@ -94,11 +97,10 @@ func ToString(data any) string {
 }
 
 func (f *Formatter) ToString(data any) string {
-	return f.toString(data, gpfContext{VistedPinters: map[uintptr]bool{}})
+	return f.toString(data, gpfContext{VistedPointers: map[uintptr]bool{}})
 }
 
 func (f *Formatter) toString(data any, ctx gpfContext) string {
-	// TODO: 无限递归问题解决了，但仍然会重复递归，希望相同的地址不要出现第二次
 	value := reflect.ValueOf(data)
 	switch value.Kind() {
 	case reflect.String:
@@ -158,7 +160,13 @@ func (f *Formatter) listToString(value reflect.Value, ctx gpfContext) string {
 		}
 		sb.WriteString(" :items=")
 	}
-	if ctx.CurrPtr != 0 { // reset after use
+	if ctx.CurrPtr != 0 {
+		if ctx.VistedPointers[ctx.CurrPtr] { // skip visited pointer
+			displayLength = 0
+		} else { // store unvisited pointer
+			ctx.VistedPointers[ctx.CurrPtr] = true
+		}
+		// reset after use
 		ctx.CurrPtr = 0
 	}
 	appendColoredString(&sb, "[", len(ctx.Indents), f.BracketColor, true)
@@ -209,7 +217,13 @@ func (f *Formatter) mapToString(value reflect.Value, ctx gpfContext) string {
 	} else {
 		appendColoredString(&sb, "{", len(ctx.Indents), f.BracketColor, true)
 	}
-	if ctx.CurrPtr != 0 { // reset after use
+	if ctx.CurrPtr != 0 {
+		if ctx.VistedPointers[ctx.CurrPtr] { // skip visited pointer
+			displayLength = 0
+		} else { // store unvisited pointer
+			ctx.VistedPointers[ctx.CurrPtr] = true
+		}
+		// reset after use
 		ctx.CurrPtr = 0
 	}
 	if displayLength > 0 { // can show items
@@ -242,7 +256,7 @@ func (f *Formatter) mapToString(value reflect.Value, ctx gpfContext) string {
 		ctx.Indents = ctx.Indents[:len(ctx.Indents)-1]
 		appendIndent(&sb, f.MapIndent, ctx.Indents, false, f.BracketColor)
 	} else if length > 0 { // cannot show items, but actually has items
-		sb.WriteString("...")
+		sb.WriteString(" ...")
 	}
 	if f.MapShowAsTag {
 		appendColoredString(&sb, ">", len(ctx.Indents), f.BracketColor, true)
@@ -339,6 +353,12 @@ func (f *Formatter) structToString(value reflect.Value, ctx gpfContext) string {
 	appendColoredString(&sb, fmt.Sprint("<", f.typeToString(type_)), len(ctx.Indents), f.BracketColor, true)
 	if ctx.CurrPtr != 0 { // pointer
 		sb.WriteString(fmt.Sprintf(" :ptr=%#x", ctx.CurrPtr))
+
+		if ctx.VistedPointers[ctx.CurrPtr] { // skip visited pointer
+			displayLength = 0
+		} else { // store unvisited pointer
+			ctx.VistedPointers[ctx.CurrPtr] = true
+		}
 		// reset after use
 		ctx.CurrPtr = 0
 	}
