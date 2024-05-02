@@ -19,6 +19,8 @@ func NewLogger(pkgName string) *Logger {
 	}
 	logger.SetFlags(log.Ldate | log.Lmicroseconds | log.Lshortfile)
 
+	logger.formatter = &DefaultFormatter
+
 	return logger
 }
 
@@ -27,8 +29,8 @@ func (l *Logger) UseFormatter(formatter *Formatter) *Logger {
 	return l
 }
 
-func (l *Logger) UseGpFormatter() *Logger {
-	return l.UseFormatter(&DefaultFormatter)
+func (l *Logger) UseStdFormatter() *Logger {
+	return l.UseFormatter(nil)
 }
 
 func (l *Logger) convertArgs(v []any) []any {
