@@ -1,6 +1,7 @@
 package gp
 
 import (
+	"fmt"
 	"log"
 	"os"
 )
@@ -42,38 +43,51 @@ func (l *Logger) convertArgs(v []any) []any {
 	return v
 }
 
+// region overrides
+
 func (l *Logger) Print(v ...any) {
-	l.Logger.Print(l.convertArgs(v)...)
+	l.Output(2, fmt.Sprint(l.convertArgs(v)...))
 }
 
 func (l *Logger) Println(v ...any) {
-	l.Logger.Println(l.convertArgs(v)...)
+	l.Output(2, fmt.Sprintln(l.convertArgs(v)...))
 }
 
 func (l *Logger) Printf(format string, v ...any) {
-	l.Logger.Printf(format, l.convertArgs(v)...)
+	l.Output(2, fmt.Sprintf(format, l.convertArgs(v)...))
 }
 
 func (l *Logger) Fatal(v ...any) {
-	l.Logger.Fatal(l.convertArgs(v)...)
+	l.Output(2, fmt.Sprint(l.convertArgs(v)...))
+	os.Exit(1)
 }
 
 func (l *Logger) Fatalln(v ...any) {
-	l.Logger.Fatalln(l.convertArgs(v)...)
+	l.Output(2, fmt.Sprintln(l.convertArgs(v)...))
+	os.Exit(1)
 }
 
 func (l *Logger) Fatalf(format string, v ...any) {
-	l.Logger.Fatalf(format, l.convertArgs(v)...)
+	l.Output(2, fmt.Sprintf(format, l.convertArgs(v)...))
+	os.Exit(1)
 }
 
 func (l *Logger) Panic(v ...any) {
-	l.Logger.Panic(l.convertArgs(v)...)
+	s := fmt.Sprint(l.convertArgs(v)...)
+	l.Output(2, s)
+	panic(s)
 }
 
 func (l *Logger) Panicln(v ...any) {
-	l.Logger.Panicln(l.convertArgs(v)...)
+	s := fmt.Sprintln(l.convertArgs(v)...)
+	l.Output(2, s)
+	panic(s)
 }
 
 func (l *Logger) Panicf(format string, v ...any) {
-	l.Logger.Panicf(format, l.convertArgs(v)...)
+	s := fmt.Sprintf(format, l.convertArgs(v)...)
+	l.Output(2, s)
+	panic(s)
 }
+
+// regionend
