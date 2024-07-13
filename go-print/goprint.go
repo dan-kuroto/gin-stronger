@@ -334,6 +334,13 @@ func (f *Formatter) funcReturnsTypeString(type_ reflect.Type) string {
 }
 
 func (f *Formatter) structToString(value reflect.Value, ctx gpfContext) string {
+	// fmt.Stringer interface
+	if value.CanInterface() {
+		if stringer, ok := value.Interface().(fmt.Stringer); ok {
+			return coloredString(stringer.String(), len(ctx.Indents), f.BracketColor, false)
+		}
+	}
+
 	type_ := value.Type()
 	var fields = make(map[int]reflect.StructField)
 	for i := 0; i < value.NumField(); i++ {

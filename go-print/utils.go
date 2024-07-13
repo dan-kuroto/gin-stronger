@@ -30,3 +30,15 @@ func appendColoredString(sb *strings.Builder, str string, colorIdx int, useColor
 		sb.WriteString(str)
 	}
 }
+
+func coloredString(str string, colorIdx int, useColor bool, bold bool) string {
+	if useColor {
+		if bold {
+			return boldColors[colorIdx%len(boldColors)].Sprint(str)
+		} else {
+			return normalColors[colorIdx%len(normalColors)].Sprint(str)
+		}
+	} else {
+		return str
+	}
+}
