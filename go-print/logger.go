@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+
+	"github.com/gin-gonic/gin"
 )
 
 type Logger struct {
@@ -34,16 +36,30 @@ func (l *Logger) ClearFormatter() *Logger {
 	return l.UseFormatter(nil)
 }
 
-func (l *Logger) convertArgs(v []any) []any {
+func (l *Logger) convertArgs(args []any) []any {
 	if l.formatter != nil {
-		for i, vv := range v {
-			v[i] = l.formatter.ToString(vv)
+		for i, arg := range args {
+			args[i] = l.formatter.ToString(arg)
 		}
 	}
-	return v
+	return args
+}
+
+func (l *Logger) convertArgsWithCtx(ctx *gin.Context, args []any) []any {
+	args = l.convertArgs(args)
+	if ctx != nil {
+		if traceId := ctx.GetString("X-Trace-Id"); traceId != "" {
+			args = append([]any{"[" + traceId + "] "}, args...)
+		}
+	}
+	return args
 }
 
 // region overrides
+
+func (l *Logger) PrintWithCtx(ctx *gin.Context, v ...any) {
+	l.Output(2, fmt.Sprint(l.convertArgsWithCtx(ctx, v)...))
+}
 
 func (l *Logger) Print(v ...any) {
 	l.Output(2, fmt.Sprint(l.convertArgs(v)...))
