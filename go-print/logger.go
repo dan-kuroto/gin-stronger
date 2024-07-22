@@ -49,7 +49,7 @@ func (l *Logger) convertArgsWithCtx(ctx *gin.Context, args []any) []any {
 	args = l.convertArgs(args)
 	if ctx != nil {
 		if traceId := ctx.GetString("X-Trace-Id"); traceId != "" {
-			args = append([]any{"[" + traceId + "] "}, args...)
+			args = append([]any{"[" + traceId + "]"}, args...)
 		}
 	}
 	return args
@@ -57,24 +57,37 @@ func (l *Logger) convertArgsWithCtx(ctx *gin.Context, args []any) []any {
 
 // region overrides
 
-func (l *Logger) PrintWithCtx(ctx *gin.Context, v ...any) {
-	l.Output(2, fmt.Sprint(l.convertArgsWithCtx(ctx, v)...))
-}
-
 func (l *Logger) Print(v ...any) {
 	l.Output(2, fmt.Sprint(l.convertArgs(v)...))
+}
+
+func (l *Logger) PrintWithCtx(ctx *gin.Context, v ...any) {
+	l.Output(2, fmt.Sprint(l.convertArgsWithCtx(ctx, v)...))
 }
 
 func (l *Logger) Println(v ...any) {
 	l.Output(2, fmt.Sprintln(l.convertArgs(v)...))
 }
 
+func (l *Logger) PrintlnWithCtx(ctx *gin.Context, v ...any) {
+	l.Output(2, fmt.Sprintln(l.convertArgsWithCtx(ctx, v)...))
+}
+
 func (l *Logger) Printf(format string, v ...any) {
 	l.Output(2, fmt.Sprintf(format, l.convertArgs(v)...))
 }
 
+func (l *Logger) PrintfWithCtx(ctx *gin.Context, format string, v ...any) {
+	l.Output(2, fmt.Sprintf(format, l.convertArgsWithCtx(ctx, v)...))
+}
+
 func (l *Logger) Fatal(v ...any) {
 	l.Output(2, fmt.Sprint(l.convertArgs(v)...))
+	os.Exit(1)
+}
+
+func (l *Logger) FatalWithCtx(ctx *gin.Context, v ...any) {
+	l.Output(2, fmt.Sprint(l.convertArgsWithCtx(ctx, v)...))
 	os.Exit(1)
 }
 
@@ -83,13 +96,29 @@ func (l *Logger) Fatalln(v ...any) {
 	os.Exit(1)
 }
 
+func (l *Logger) FatallnWithCtx(ctx *gin.Context, v ...any) {
+	l.Output(2, fmt.Sprintln(l.convertArgsWithCtx(ctx, v)...))
+	os.Exit(1)
+}
+
 func (l *Logger) Fatalf(format string, v ...any) {
 	l.Output(2, fmt.Sprintf(format, l.convertArgs(v)...))
 	os.Exit(1)
 }
 
+func (l *Logger) FatalfWithCtx(ctx *gin.Context, format string, v ...any) {
+	l.Output(2, fmt.Sprintf(format, l.convertArgsWithCtx(ctx, v)...))
+	os.Exit(1)
+}
+
 func (l *Logger) Panic(v ...any) {
 	s := fmt.Sprint(l.convertArgs(v)...)
+	l.Output(2, s)
+	panic(s)
+}
+
+func (l *Logger) PanicWithCtx(ctx *gin.Context, v ...any) {
+	s := fmt.Sprint(l.convertArgsWithCtx(ctx, v)...)
 	l.Output(2, s)
 	panic(s)
 }
@@ -100,8 +129,20 @@ func (l *Logger) Panicln(v ...any) {
 	panic(s)
 }
 
+func (l *Logger) PaniclnWithCtx(ctx *gin.Context, v ...any) {
+	s := fmt.Sprintln(l.convertArgsWithCtx(ctx, v)...)
+	l.Output(2, s)
+	panic(s)
+}
+
 func (l *Logger) Panicf(format string, v ...any) {
 	s := fmt.Sprintf(format, l.convertArgs(v)...)
+	l.Output(2, s)
+	panic(s)
+}
+
+func (l *Logger) PanicfWithCtx(ctx *gin.Context, format string, v ...any) {
+	s := fmt.Sprintf(format, l.convertArgsWithCtx(ctx, v)...)
 	l.Output(2, s)
 	panic(s)
 }
