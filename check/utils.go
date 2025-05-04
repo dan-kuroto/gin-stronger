@@ -3,11 +3,7 @@ package check
 import (
 	"fmt"
 	"reflect"
-
-	gp "github.com/dan-kuroto/gin-stronger/go-print"
 )
-
-var formatter = gp.Formatter{}
 
 func printWarning(format string, a ...any) {
 	fmt.Println("[WARNING]", fmt.Sprintf(format, a...))
