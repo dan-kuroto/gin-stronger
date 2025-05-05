@@ -1,11 +1,11 @@
 package gs
 
 import (
-	"log"
 	"net/http"
 
 	"github.com/dan-kuroto/gin-stronger/config"
 	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog/log"
 )
 
 type HttpMethod uint16
@@ -141,7 +141,7 @@ func SetStatic(getter StaticMapFunc) {
 func RunApp[T config.IConfiguration](config T) {
 	PrintBanner()
 	if err := InitConfig(config); err != nil {
-		log.Println("init config failed:", err.Error())
+		log.Err(err).Msg("InitConfig failed")
 	}
 	if onConfigInitialized != nil {
 		onConfigInitialized()

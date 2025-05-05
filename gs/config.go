@@ -1,12 +1,12 @@
 package gs
 
 import (
-	"log"
 	"os"
 
 	"gopkg.in/yaml.v3"
 
 	"github.com/dan-kuroto/gin-stronger/config"
+	"github.com/rs/zerolog/log"
 )
 
 // default config instance
@@ -32,7 +32,7 @@ func InitConfig[T config.IConfiguration](config T) error {
 			return err
 		}
 	}
-	log.Println("config load complete")
+	log.Info().Msg("config load complete")
 	return nil
 }
 
