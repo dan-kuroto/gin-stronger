@@ -1,6 +1,7 @@
 package gs
 
 import (
+	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 	"github.com/lithammer/shortuuid/v4"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 func init() {
@@ -21,11 +23,25 @@ func init() {
 		}
 		return funcObj.Name() + ":" + strconv.Itoa(line)
 	}
-	log.Logger = log.With().Caller().Logger()
+	logFile := &lumberjack.Logger{
+		Filename:   "logs/app.log", // 日志文件路径
+		MaxSize:    10,             // 每个日志文件的最大大小（MB）
+		MaxBackups: 10,             // 保留旧日志文件的最大数量
+		MaxAge:     30,             // 保留旧日志文件的最大天数
+		Compress:   true,           // 是否压缩旧日志文件
+	}
+	defer logFile.Close()
+	log.Logger = zerolog.New(zerolog.MultiLevelWriter(
+		zerolog.LevelWriterAdapter{Writer: os.Stderr},
+		logFile,
+	)).With().Timestamp().Caller().Logger()
 }
 
 // retrieves a logger from the gin.Context or creates a new one if it doesn't exist.
 func GetLoggerByGinCtx(ctx *gin.Context) *zerolog.Logger {
+	if ctx == nil {
+		return &log.Logger
+	}
 	value, exists := ctx.Get("gs-logger")
 	if exists {
 		return value.(*zerolog.Logger)
